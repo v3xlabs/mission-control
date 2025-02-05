@@ -5,6 +5,8 @@ on:
     push:
         branches:
             - master
+        tags:
+            - v*
 
 # Set up some global variables we'll use throughout
 env:
