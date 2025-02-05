@@ -120,5 +120,6 @@ jobs:
                   gh release create $VERSION \
                       --title "Release $VERSION" \
                       --draft \
-                      ./x86_64/${{ env.BINARY_NAME }}#v3x-mission-control-x86_64-linux \
-                      ./aarch64/${{ env.BINARY_NAME }}#v3x-mission-control-aarch64-linux
+                      --repo ${{ github.repository }} \
+                      ./x86_64/${{ env.BINARY_NAME }} \
+                      ./aarch64/${{ env.BINARY_NAME }}
