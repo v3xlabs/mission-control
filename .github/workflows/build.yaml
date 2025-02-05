@@ -115,11 +115,21 @@ jobs:
               run: |
                   # Extract version from tag
                   VERSION=${GITHUB_REF#refs/tags/}
-
-                  # Create release
+                  
+                  # Debug: List contents of directories
+                  echo "Contents of x86_64 directory:"
+                  ls -la ./x86_64/
+                  echo "Contents of aarch64 directory:"
+                  ls -la ./aarch64/
+                  
+                  # First create the release without assets
                   gh release create $VERSION \
                       --title "Release $VERSION" \
                       --draft \
-                      --repo ${{ github.repository }} \
+                      --repo ${{ github.repository }}
+                  
+                  # Then upload each asset separately
+                  gh release upload $VERSION \
                       ./x86_64/${{ env.BINARY_NAME }} \
-                      ./aarch64/${{ env.BINARY_NAME }}
+                      ./aarch64/${{ env.BINARY_NAME }} \
+                      --repo ${{ github.repository }}
