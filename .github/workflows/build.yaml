@@ -120,17 +120,20 @@ jobs:
                   echo "Contents of x86_64 directory:"
                   ls -la ./x86_64/
                   mv ./x86_64/${{ env.BINARY_NAME }} ./x86_64/${{ env.BINARY_NAME }}-x86_64
+                  chmod +x ./x86_64/${{ env.BINARY_NAME }}-x86_64
                   # Set ownership to the current user
                   chown -R $(whoami) ./x86_64/
+                  
                   echo "Contents of aarch64 directory:"
                   ls -la ./aarch64/
                   mv ./aarch64/${{ env.BINARY_NAME }} ./aarch64/${{ env.BINARY_NAME }}-aarch64
+                  chmod +x ./aarch64/${{ env.BINARY_NAME }}-aarch64
                   chown -R $(whoami) ./aarch64/
 
                   # First create the release without assets
                   gh release create $VERSION \
                       --title "Release $VERSION" \
                       --draft \
-                      --repo ${{ github.repository }}
+                      --repo ${{ github.repository }} \
                       ./x86_64/${{ env.BINARY_NAME }}-x86_64 \
                       ./aarch64/${{ env.BINARY_NAME }}-aarch64
