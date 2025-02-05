@@ -132,7 +132,7 @@ jobs:
 
                   # First create the release without assets
                   gh release create $VERSION \
-                      --title "Release $VERSION" \
+                      --title "$VERSION" \
                       --draft \
                       --repo ${{ github.repository }} \
                       ./x86_64/${{ env.BINARY_NAME }}-x86_64 \

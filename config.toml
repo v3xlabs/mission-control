@@ -1,0 +1,12 @@
+[homeassistant]
+mqtt_url = "mqtt://localhost:1883"
+mqtt_username = "username"
+mqtt_password = "password"
+
+[device]
+name = "My Display"
+id = "my_display_1"
+
+[display]
+# sleep time in seconds
+sleep_time = 10
