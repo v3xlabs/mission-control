@@ -92,6 +92,9 @@ jobs:
         permissions:
             contents: write # Needed for creating releases
         steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
             # Download all artifacts for both architectures
             - name: Download x86_64 binary
               uses: actions/download-artifact@v4
