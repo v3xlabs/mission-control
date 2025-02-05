@@ -128,8 +128,9 @@ jobs:
                       --draft \
                       --repo ${{ github.repository }}
                   
-                  # Then upload each asset separately
+                  # Then upload each asset with unique names
                   gh release upload $VERSION \
-                      ./x86_64/${{ env.BINARY_NAME }} \
-                      ./aarch64/${{ env.BINARY_NAME }} \
-                      --repo ${{ github.repository }}
+                      --repo ${{ github.repository }} \
+                      --clobber \
+                      ./x86_64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-x86_64 \
+                      ./aarch64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-aarch64
