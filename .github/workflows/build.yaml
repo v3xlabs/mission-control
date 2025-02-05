@@ -2,9 +2,9 @@ name: 🏗️ Build
 
 # Trigger this workflow when changes happen to our core directories
 on:
-  push:
-    branches:
-      - master
+    push:
+        branches:
+            - master
 
 # Set up some global variables we'll use throughout
 env:
@@ -15,105 +15,105 @@ env:
     COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        platform:
-          - arch: x86_64-unknown-linux-musl
-            docker: linux/amd64
-          - arch: aarch64-unknown-linux-musl
-            docker: linux/arm64
-    timeout-minutes: 20 # Prevent hanging builds
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build:
+        strategy:
+            matrix:
+                platform:
+                    - arch: x86_64-unknown-linux-musl
+                      docker: linux/amd64
+                    - arch: aarch64-unknown-linux-musl
+                      docker: linux/arm64
+        timeout-minutes: 20 # Prevent hanging builds
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      # Set up Rust with the specific target we need
-      - name: Install Rust
-        run: rustup toolchain install stable --profile minimal --no-self-update
+            # Set up Rust with the specific target we need
+            - name: Install Rust
+              run: rustup toolchain install stable --profile minimal --no-self-update
 
-      # Speed up builds by caching dependencies
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.platform.arch }}
-          workspaces: app          
+            # Speed up builds by caching dependencies
+            - name: Cache Rust
+              uses: Swatinem/rust-cache@v2
+              with:
+                  key: ${{ matrix.platform.arch }}
+                  workspaces: app
 
-      # Install cross
-      - name: Install cross
-        run: cargo install cross
+            # Install cross
+            - name: Install cross
+              run: cargo install cross
 
-      # Update version number in app/Cargo.toml
-      # If tag is a release use that
-      # Otherwise use the version number in the app/Cargo.toml and append it with -alpha
-      - name: Update version number
-        working-directory: app
-        run: |
-          if [[ "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-            echo "Release tag detected, using version: $VERSION"
-            sed -i "0,/^version = .*/s//version = \"${VERSION}\"/" Cargo.toml
-          else
-            echo "No release tag detected, using version from Cargo.toml"
-            version=$(grep -oP 'version = "([^"]+?)"' Cargo.toml | head -n 1 | sed 's/^version = "\(.*\)"$/\1/')
-            echo "Current version: $version"
-            sed -i '0,/^version = .*/s//version = "'${version}'-alpha"/' Cargo.toml
-          fi
+            # Update version number in app/Cargo.toml
+            # If tag is a release use that
+            # Otherwise use the version number in the app/Cargo.toml and append it with -alpha
+            - name: Update version number
+              working-directory: app
+              run: |
+                  if [[ "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                    VERSION=${GITHUB_REF#refs/tags/v}
+                    echo "Release tag detected, using version: $VERSION"
+                    sed -i "0,/^version = .*/s//version = \"${VERSION}\"/" Cargo.toml
+                  else
+                    echo "No release tag detected, using version from Cargo.toml"
+                    version=$(grep -oP 'version = "([^"]+?)"' Cargo.toml | head -n 1 | sed 's/^version = "\(.*\)"$/\1/')
+                    echo "Current version: $version"
+                    sed -i '0,/^version = .*/s//version = "'${version}'-alpha"/' Cargo.toml
+                  fi
 
-      # 🔨 Build our static binary
-      - name: Build Rust binary
-        working-directory: app
-        env:
-          BINARY_NAME: ${{ env.BINARY_NAME }}
-          SQLX_OFFLINE: true # Use prepared SQL queries
-        run: cross build --target ${{ matrix.platform.arch }} --release
+            # 🔨 Build our static binary
+            - name: Build Rust binary
+              working-directory: app
+              env:
+                  BINARY_NAME: ${{ env.BINARY_NAME }}
+                  SQLX_OFFLINE: true # Use prepared SQL queries
+              run: cross build --target ${{ matrix.platform.arch }} --release
 
-      # 📦 Save our binary for later
-      - name: Upload built binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: v3x-mission-control-${{ matrix.platform.arch }}
-          path: app/target/${{ matrix.platform.arch }}/release/${{ env.BINARY_NAME }}
-          retention-days: 1 # Save storage by cleaning up quickly
-          compression-level: 9 # Maximum compression
-    
+            # 📦 Save our binary for later
+            - name: Upload built binary as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: v3x-mission-control-${{ matrix.platform.arch }}
+                  path: app/target/${{ matrix.platform.arch }}/release/${{ env.BINARY_NAME }}
+                  retention-days: 1 # Save storage by cleaning up quickly
+                  compression-level: 9 # Maximum compression
+
     # if this is a tagged release, we want to create a new release
     release:
-      name: Release
-      needs: build
-      # Only run this job if we're on a tag
-      if: startsWith(github.ref, 'refs/tags/')
-      runs-on: ubuntu-latest
-      permissions:
-        contents: write # Needed for creating releases
-      steps:
-        # Download all artifacts for both architectures
-        - name: Download x86_64 binary
-          uses: actions/download-artifact@v4
-          with:
-            name: v3x-mission-control-x86_64-unknown-linux-musl
-            path: ./x86_64
+        name: Release
+        needs: build
+        # Only run this job if we're on a tag
+        if: startsWith(github.ref, 'refs/tags/')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write # Needed for creating releases
+        steps:
+            # Download all artifacts for both architectures
+            - name: Download x86_64 binary
+              uses: actions/download-artifact@v4
+              with:
+                  name: v3x-mission-control-x86_64-unknown-linux-musl
+                  path: ./x86_64
 
-        - name: Download aarch64 binary
-          uses: actions/download-artifact@v4
-          with:
-            name: v3x-mission-control-aarch64-unknown-linux-musl
-            path: ./aarch64
+            - name: Download aarch64 binary
+              uses: actions/download-artifact@v4
+              with:
+                  name: v3x-mission-control-aarch64-unknown-linux-musl
+                  path: ./aarch64
 
-        # Create the release
-        - name: Create Release
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
-            # Extract version from tag
-            VERSION=${GITHUB_REF#refs/tags/}
-            
-            # Create release
-            gh release create $VERSION \
-              --title "Release $VERSION" \
-              --draft \
-              ./x86_64/${{ env.BINARY_NAME }}#v3x-mission-control-x86_64-linux \
-              ./aarch64/${{ env.BINARY_NAME }}#v3x-mission-control-aarch64-linux
+            # Create the release
+            - name: Create Release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  # Extract version from tag
+                  VERSION=${GITHUB_REF#refs/tags/}
+
+                  # Create release
+                  gh release create $VERSION \
+                      --title "Release $VERSION" \
+                      --draft \
+                      ./x86_64/${{ env.BINARY_NAME }}#v3x-mission-control-x86_64-linux \
+                      ./aarch64/${{ env.BINARY_NAME }}#v3x-mission-control-aarch64-linux
