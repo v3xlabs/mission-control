@@ -1,0 +1,25 @@
+[package]
+name = "v3x-mission-control"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+async-std = { version = "1.13.0", features = [
+    "attributes",
+    "tokio1",
+    "unstable",
+] }
+dotenvy = "0.15.7"
+futures = "0.3.31"
+poem = { version = "3.1.5", features = ["rustls"] }
+reqwest = { version = "0.12.9", features = [
+    "rustls-tls",
+    # Add back the default features excluding native-tls
+    "charset",
+    "http2",
+    "macos-system-configuration",
+], default-features = false }
+rustls = "0.23.20"
+serde = { version = "1.0.200", features = ["derive"] }
+figment = { version = "0.10.19", features = ["toml", "json", "env"] }
