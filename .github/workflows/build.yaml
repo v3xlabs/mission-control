@@ -115,16 +115,17 @@ jobs:
               run: |
                   # Extract version from tag
                   VERSION=${GITHUB_REF#refs/tags/}
-                  
+
                   # Debug: List contents of directories
                   echo "Contents of x86_64 directory:"
                   ls -la ./x86_64/
                   mv ./x86_64/${{ env.BINARY_NAME }} ./x86_64/${{ env.BINARY_NAME }}-x86_64
-                  chown -R ${{ github.actor }}:${{ github.actor }} ./x86_64/
+                  # Set ownership to the current user
+                  chown -R $(whoami) ./x86_64/
                   echo "Contents of aarch64 directory:"
                   ls -la ./aarch64/
                   mv ./aarch64/${{ env.BINARY_NAME }} ./aarch64/${{ env.BINARY_NAME }}-aarch64
-                  chown -R ${{ github.actor }}:${{ github.actor }} ./aarch64/
+                  chown -R $(whoami) ./aarch64/
 
                   # First create the release without assets
                   gh release create $VERSION \
