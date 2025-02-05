@@ -127,10 +127,12 @@ jobs:
                       --title "Release $VERSION" \
                       --draft \
                       --repo ${{ github.repository }}
+                      './x86_64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-x86_64' \
+                      './aarch64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-aarch64'
                   
-                  # Then upload each asset with unique names
-                  gh release upload $VERSION \
-                      --repo ${{ github.repository }} \
-                      --clobber \
-                      ./x86_64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-x86_64 \
-                      ./aarch64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-aarch64
+                #   # Then upload each asset with unique names
+                #   gh release upload $VERSION \
+                #       --repo ${{ github.repository }} \
+                #       --clobber \
+                #       ./x86_64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-x86_64 \
+                #       ./aarch64/${{ env.BINARY_NAME }}#${{ env.BINARY_NAME }}-aarch64
