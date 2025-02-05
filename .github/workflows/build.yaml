@@ -129,5 +129,5 @@ jobs:
                       --title "Release $VERSION" \
                       --draft \
                       --repo ${{ github.repository }}
-                      ./x86_64/${{ env.BINARY_NAME }} \
-                      ./aarch64/${{ env.BINARY_NAME }}
+                      ./x86_64/${{ env.BINARY_NAME }}-x86_64 \
+                      ./aarch64/${{ env.BINARY_NAME }}-aarch64
