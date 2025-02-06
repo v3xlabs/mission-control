@@ -23,6 +23,8 @@ impl ChromeController {
     }
 
     pub async fn start(&self, config: &ChromiumConfig) -> Result<()> {
+        let home_path = std::env::var("HOME").unwrap();
+        let user_data_dir = format!("{}/.chromium-mission-data", home_path);
         let (browser, mut handler) = Browser::launch(
             BrowserConfig::builder()
                 .chrome_executable(config.binary_path.clone().unwrap_or("chromium".to_string()))
@@ -35,6 +37,7 @@ impl ChromeController {
                 .arg("--disable-session-crashed-bubble")
                 .arg("--disable-features=TranslateUI")
                 .arg("--remote-debugging-port=9222")
+                .arg(format!("--user-data-dir={}", user_data_dir))
                 .viewport(None)
                 .build()
                 .unwrap(),
