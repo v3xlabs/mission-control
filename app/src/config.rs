@@ -25,6 +25,7 @@ pub struct DeviceConfig {
 #[derive(Debug, Deserialize)]
 pub struct DisplayConfig {
     pub sleep_time: Option<u32>,
+    pub xrandr: Option<bool>,
 }
 
 pub fn load_config() -> Result<Config> {

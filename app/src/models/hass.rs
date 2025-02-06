@@ -10,48 +10,110 @@ pub struct HassDeviceDiscoveryPayload {
     // pub device_class: String,
     pub device: HassDevice,
     pub state_topic: String,
-    pub state_on: String,
-    pub state_off: String,
-    pub payload_on: String,
-    pub payload_off: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_on: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_off: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_on: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_off: Option<String>,
     pub command_topic: String,
     pub availability_topic: String,
-    pub payload_available: String,
-    pub payload_not_available: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_available: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_not_available: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub step: Option<f32>,
+
+    #[serde(skip)]
+    pub config_topic: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HassDevice {
     pub identifiers: Vec<String>,
     pub name: String,
+    pub configuration_url: String,
+    pub serial_number: String,
 }
 
 impl HassDeviceDiscoveryPayload {
-    pub fn new(
-        name: String,
-        unique_id: String,
-        state_topic: String,
-        command_topic: String,
-        availability_topic: String,
-    ) -> Self {
+    pub fn new_backlight(name: String, unique_id: String, availability_topic: String) -> Self {
         Self {
-            name: name.clone(),
+            name: format!("{name} Backlight", name = name),
             icon: "mdi:monitor".to_string(),
-            unique_id: unique_id.clone(),
+            unique_id: format!("{unique_id}_backlight", unique_id = unique_id),
             // device_class: "switch".to_string(),
             device: HassDevice {
-                identifiers: vec![unique_id],
+                identifiers: vec![unique_id.clone()],
                 name,
+                configuration_url: "https://v3x.fyi/s1".to_string(),
+                serial_number: unique_id.clone(),
             },
-            state_topic,
-            command_topic,
+            state_topic: format!(
+                "homeassistant/switch/{unique_id}_backlight/state",
+                unique_id = unique_id
+            ),
+            command_topic: format!(
+                "homeassistant/switch/{unique_id}_backlight/set",
+                unique_id = unique_id
+            ),
+            config_topic: format!(
+                "homeassistant/switch/{unique_id}_backlight/config",
+                unique_id = unique_id
+            ),
             availability_topic,
-            state_on: "ON".to_string(),
-            state_off: "OFF".to_string(),
-            payload_on: "ON".to_string(),
-            payload_off: "OFF".to_string(),
-            payload_available: "online".to_string(),
-            payload_not_available: "offline".to_string(),
+            state_on: Some("ON".to_string()),
+            state_off: Some("OFF".to_string()),
+            payload_on: Some("ON".to_string()),
+            payload_off: Some("OFF".to_string()),
+            payload_available: Some("online".to_string()),
+            payload_not_available: Some("offline".to_string()),
+            min: None,
+            max: None,
+            step: None,
+        }
+    }
+
+    pub fn new_brightness(name: String, unique_id: String, availability_topic: String) -> Self {
+        Self {
+            name: format!("{name} Brightness", name = name),
+            icon: "mdi:brightness-7".to_string(),
+            unique_id: format!("{unique_id}_brightness", unique_id = unique_id),
+            device: HassDevice {
+                identifiers: vec![unique_id.clone()],
+                name,
+                configuration_url: "https://v3x.fyi/s1".to_string(),
+                serial_number: unique_id.clone(),
+            },
+            state_topic: format!(
+                "homeassistant/number/{unique_id}_brightness/state",
+                unique_id = unique_id
+            ),
+            command_topic: format!(
+                "homeassistant/number/{unique_id}_brightness/set",
+                unique_id = unique_id
+            ),
+            config_topic: format!(
+                "homeassistant/number/{unique_id}_brightness/config",
+                unique_id = unique_id
+            ),
+            availability_topic,
+            state_on: None,
+            state_off: None,
+            payload_on: None,
+            payload_off: None,
+            payload_available: None,
+            payload_not_available: None,
+            min: Some(0.0),
+            max: Some(1.0),
+            step: Some(0.01),
         }
     }
 }
