@@ -10,3 +10,6 @@ id = "my_display_1"
 [display]
 # sleep time in seconds
 sleep_time = 10
+
+[chromium]
+enabled = true

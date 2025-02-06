@@ -1,10 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use async_std::task;
+use chrome::ChromeController;
 use models::hass::HassDeviceDiscoveryPayload;
 use reqwest::Url;
 use rumqttc::{Client, Event, LastWill, MqttOptions, Packet, QoS};
 
+pub mod chrome;
 pub mod config;
 pub mod models;
 
@@ -15,6 +18,16 @@ async fn main() -> Result<()> {
     let config = config::load_config()?;
 
     println!("Config: {:?}", config);
+
+    let chromium = ChromeController::new();
+
+    if let Some(chromium_config) = config.chromium {
+        let chromium_config_clone = chromium_config.clone();
+    
+        task::spawn(async move {
+            chromium.start(&chromium_config_clone).await.unwrap();
+        });
+    }
 
     let mqtt_url = config.homeassistant.mqtt_url.parse::<Url>().unwrap();
     let mqtt_port = mqtt_url.port().unwrap_or(1883);
