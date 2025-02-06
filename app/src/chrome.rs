@@ -6,7 +6,17 @@ use async_std::{
     sync::Mutex,
     task::{self, sleep},
 };
-use chromiumoxide::{cdp::browser_protocol::page::NavigateParams, Browser, BrowserConfig, Page};
+use chromiumoxide::{
+    cdp::{
+        browser_protocol::page::{
+            EventScreencastFrame, NavigateParams, ScreencastFrameAckParams, StartScreencastFormat,
+            StartScreencastParams,
+        },
+        CdpEvent,
+    },
+    listeners::EventStream,
+    Browser, BrowserConfig, Page,
+};
 
 use crate::config::ChromiumConfig;
 
@@ -53,7 +63,11 @@ impl ChromeController {
 
         let (browser, mut handler) = Browser::launch(browser_config).await?;
 
-        task::spawn(async move { while let Some(_) = handler.next().await {} });
+        task::spawn(async move {
+            while let Some(event) = handler.next().await {
+                println!("Event: {:?}", event);
+            }
+        });
 
         sleep(Duration::from_secs(2)).await;
 
@@ -72,6 +86,39 @@ impl ChromeController {
                 )
                 .await
                 .unwrap();
+
+                page.execute(
+                    StartScreencastParams::builder()
+                        .format(StartScreencastFormat::Jpeg)
+                        .quality(80)
+                        .build(),
+                )
+                .await?;
+
+                let page_ref = page.clone();
+                task::spawn(async move {
+                    let mut events = page_ref
+                        .event_listener::<EventScreencastFrame>()
+                    .await
+                        .unwrap();
+                    while let Some(frame) = events.next().await {
+                        // println!("Event: {:?}", frame);
+
+                        let frame_buf: &[u8] = frame.data.as_ref();
+                        println!("Received frame: {}", frame_buf.len());
+
+                        // Acknowledge the frame to continue the stream
+                        page_ref
+                            .execute(
+                                ScreencastFrameAckParams::builder()
+                                    .session_id(frame.session_id)
+                                    .build()
+                                    .unwrap(),
+                            )
+                            .await
+                            .unwrap();
+                    }
+                });
 
                 pages.insert(key.clone(), page);
             }
