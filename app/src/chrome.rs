@@ -28,6 +28,7 @@ impl ChromeController {
                 .chrome_executable(config.binary_path.clone().unwrap_or("chromium".to_string()))
                 .disable_default_args()
                 .with_head()
+                .enable_cache()
                 .arg("--kiosk")
                 .arg("--noerrdialogs")
                 .arg("--disable-infobars")
