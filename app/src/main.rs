@@ -6,10 +6,13 @@ use chrome::ChromeController;
 use models::hass::HassDeviceDiscoveryPayload;
 use reqwest::Url;
 use rumqttc::{Client, Event, LastWill, MqttOptions, Packet, QoS};
+use state::AppState;
 
 pub mod chrome;
 pub mod config;
 pub mod models;
+pub mod state;
+pub mod http;
 
 #[async_std::main]
 async fn main() -> Result<()> {
@@ -19,15 +22,21 @@ async fn main() -> Result<()> {
 
     println!("Config: {:?}", config);
 
-    let chromium = ChromeController::new();
+    let chromium = Arc::new(ChromeController::new());
 
     if let Some(chromium_config) = config.chromium {
         let chromium_config_clone = chromium_config.clone();
-    
+
+        let chromium_2 = chromium.clone();
+
         task::spawn(async move {
-            chromium.start(&chromium_config_clone).await.unwrap();
+            chromium_2.start(&chromium_config_clone).await.unwrap();
         });
     }
+
+    let state = Arc::new(AppState {
+        chrome: chromium,
+    });
 
     let mqtt_url = config.homeassistant.mqtt_url.parse::<Url>().unwrap();
     let mqtt_port = mqtt_url.port().unwrap_or(1883);
@@ -144,6 +153,11 @@ async fn main() -> Result<()> {
                 discovery_payload_device_str,
             )
             .unwrap();
+    });
+
+    let http_state = state;
+    task::spawn(async move {
+        http::start_http(http_state).await.unwrap();
     });
 
     for (i, notification) in connection.iter().enumerate() {

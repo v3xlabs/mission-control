@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use async_std::{
@@ -7,27 +7,27 @@ use async_std::{
     task::{self, sleep},
 };
 use chromiumoxide::{
-    cdp::{
-        browser_protocol::page::{
-            EventScreencastFrame, NavigateParams, ScreencastFrameAckParams, StartScreencastFormat,
-            StartScreencastParams,
-        },
-        CdpEvent,
+    cdp::browser_protocol::page::{
+        EventScreencastFrame, NavigateParams, ScreencastFrameAckParams, StartScreencastFormat,
+        StartScreencastParams,
     },
-    listeners::EventStream,
     Browser, BrowserConfig, Page,
 };
 
 use crate::config::ChromiumConfig;
 
 pub struct ChromeController {
-    current_playlist: Mutex<Option<String>>,
+    pub current_playlist: Arc<Mutex<Option<String>>>,
+    pub should_screen_capture: Arc<Mutex<bool>>,
+    pub last_frame: Arc<Mutex<HashMap<String, Vec<u8>>>>,
 }
 
 impl Default for ChromeController {
     fn default() -> Self {
         Self {
-            current_playlist: Mutex::new(None),
+            current_playlist: Arc::new(Mutex::new(None)),
+            should_screen_capture: Arc::new(Mutex::new(true)),
+            last_frame: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -74,7 +74,9 @@ impl ChromeController {
         // Open all tabs that should be persisted
         let mut pages: HashMap<String, Page> = HashMap::new();
 
-        if let Some(tabs) = &config.tabs {
+        let tabs = config.tabs.clone();
+
+        if let Some(tabs) = tabs {
             for (key, tab) in tabs {
                 // Open a new tab for user-requested URL.
                 let page = browser.new_page("about:blank").await?;
@@ -96,16 +98,24 @@ impl ChromeController {
                 .await?;
 
                 let page_ref = page.clone();
+                let self_arc = self.last_frame.clone();
+                let key_clone = key.clone();
+
                 task::spawn(async move {
                     let mut events = page_ref
                         .event_listener::<EventScreencastFrame>()
-                    .await
+                        .await
                         .unwrap();
                     while let Some(frame) = events.next().await {
                         // println!("Event: {:?}", frame);
 
                         let frame_buf: &[u8] = frame.data.as_ref();
                         println!("Received frame: {}", frame_buf.len());
+
+                        self_arc
+                            .lock()
+                            .await
+                            .insert(key_clone.clone(), frame_buf.to_vec());
 
                         // Acknowledge the frame to continue the stream
                         page_ref
