@@ -42,6 +42,7 @@ impl ChromeController {
                 .arg("--disable-infobars")
                 .arg("--disable-session-crashed-bubble")
                 .arg("--disable-features=TranslateUI")
+                .arg("--remote-debugging-address=0.0.0.0")
                 .port(9222)
                 .arg("--no-first-run")
                 .arg("--password-store=basic")
