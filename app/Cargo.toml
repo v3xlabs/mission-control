@@ -27,3 +27,4 @@ figment = { version = "0.10.19", features = ["toml", "json", "env"] }
 rumqttc = "0.24.0"
 chromiumoxide = "0.7.0"
 base64 = "0.22.1"
+async-stream = "0.3.6"
