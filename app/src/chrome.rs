@@ -2,7 +2,6 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::Result;
 use async_std::{
-    process::Command,
     stream::StreamExt,
     sync::Mutex,
     task::{self, sleep},
@@ -15,11 +14,17 @@ pub struct ChromeController {
     current_playlist: Mutex<Option<String>>,
 }
 
-impl ChromeController {
-    pub fn new() -> Self {
+impl Default for ChromeController {
+    fn default() -> Self {
         Self {
             current_playlist: Mutex::new(None),
         }
+    }
+}
+
+impl ChromeController {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub async fn start(&self, config: &ChromiumConfig) -> Result<()> {
@@ -37,7 +42,7 @@ impl ChromeController {
                 .arg("--disable-infobars")
                 .arg("--disable-session-crashed-bubble")
                 .arg("--disable-features=TranslateUI")
-                .arg("--remote-debugging-port=9222")
+                .port(9222)
                 .arg("--no-first-run")
                 .arg("--password-store=basic")
                 .viewport(None)
@@ -47,6 +52,8 @@ impl ChromeController {
         .await?;
 
         task::spawn(async move { while let Some(_) = handler.next().await {} });
+
+        sleep(Duration::from_secs(2)).await;
 
         // Open all tabs that should be persisted
         let mut pages: HashMap<String, Page> = HashMap::new();
@@ -79,7 +86,7 @@ impl ChromeController {
         }
 
         let mut current_tab = 0;
-        while true {
+        loop {
             if let Some(playlists) = &config.playlists {
                 if let Some(playlist) = self.current_playlist.lock().await.as_ref() {
                     if let Some(playlist_config) = playlists.get(playlist) {
