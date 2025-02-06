@@ -54,7 +54,7 @@ async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl Into
 async fn preview_live(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl IntoResponse {
     let boundary = "myboundary";
     let xstate = state.clone();
-    
+
     // Create a stream that loops indefinitely, yielding a new frame each iteration.
     let stream = async_stream::stream! {
         loop {
@@ -74,7 +74,7 @@ async fn preview_live(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl
                 }
             }
             // Wait a short duration before sending the next frame.
-            async_std::task::sleep(Duration::from_millis(100)).await;
+            async_std::task::sleep(Duration::from_millis(1000 / 4)).await;
         }
     };
 

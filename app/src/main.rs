@@ -10,9 +10,9 @@ use state::AppState;
 
 pub mod chrome;
 pub mod config;
+pub mod http;
 pub mod models;
 pub mod state;
-pub mod http;
 
 #[async_std::main]
 async fn main() -> Result<()> {
@@ -34,9 +34,7 @@ async fn main() -> Result<()> {
         });
     }
 
-    let state = Arc::new(AppState {
-        chrome: chromium,
-    });
+    let state = Arc::new(AppState { chrome: chromium });
 
     let mqtt_url = config.homeassistant.mqtt_url.parse::<Url>().unwrap();
     let mqtt_port = mqtt_url.port().unwrap_or(1883);
@@ -67,7 +65,7 @@ async fn main() -> Result<()> {
     println!("MQTT URL: {}", mqtt_url);
 
     let mut mqttoptions = MqttOptions::new("mission-control-1", mqtt_url, mqtt_port);
-    mqttoptions.set_keep_alive(Duration::from_secs(5));
+    mqttoptions.set_keep_alive(Duration::from_secs(15));
     mqttoptions.set_last_will(LastWill::new(
         &availability_topic,
         availability_lastwill,
@@ -160,56 +158,93 @@ async fn main() -> Result<()> {
         http::start_http(http_state).await.unwrap();
     });
 
+    let mut error_count = 0;
+
     for (i, notification) in connection.iter().enumerate() {
         println!("Notification: {:?}", notification);
 
-        if let Ok(payload) = notification {
-            match payload {
-                Event::Incoming(event) => {
-                    match event {
-                        Packet::Publish(publish) => {
-                            println!("Publish: {:?}", &publish);
+        match notification {
+            Ok(payload) => {
+                match payload {
+                    Event::Incoming(event) => {
+                        match event {
+                            Packet::Publish(publish) => {
+                                println!("Publish: {:?}", &publish);
 
-                            if publish.topic.eq(&discovery_payload_arc.command_topic) {
-                                println!("Command received: {:?}", &publish.payload);
+                                if publish.topic.eq(&discovery_payload_arc.command_topic) {
+                                    println!("Command received: {:?}", &publish.payload);
 
-                                if publish.payload.eq("ON") {
-                                    println!("Turning on display");
-                                    client_arc_2
-                                        .publish(
-                                            &discovery_payload_arc.state_topic,
-                                            QoS::AtLeastOnce,
-                                            true,
-                                            "ON",
-                                        )
-                                        .unwrap();
+                                    if publish.payload.eq("ON") {
+                                        println!("Turning on display");
+                                        client_arc_2
+                                            .publish(
+                                                &discovery_payload_arc.state_topic,
+                                                QoS::AtLeastOnce,
+                                                true,
+                                                "ON",
+                                            )
+                                            .unwrap();
 
-                                    if let Some(xrandr) = &config.display.xrandr {
-                                        let xrandr_command = format!(
-                                            "xset dpms force on && xset s off && xset -dpms",
-                                        );
-                                        let xrandr_result = std::process::Command::new("sh")
-                                            .arg("-c")
-                                            .arg(xrandr_command)
-                                            .output()
-                                            .expect("Failed to execute xrandr command");
-                                        println!("xrandr result: {:?}", xrandr_result);
-                                    }
-                                } else if publish.payload.eq("OFF") {
-                                    println!("Turning off display");
-                                    client_arc_2
-                                        .publish(
-                                            &discovery_payload_arc.state_topic,
-                                            QoS::AtLeastOnce,
-                                            true,
-                                            "OFF",
-                                        )
-                                        .unwrap();
+                                        if let Some(xrandr) = &config.display.xrandr {
+                                            let xrandr_command = format!(
+                                                "xset dpms force on && xset s off && xset -dpms",
+                                            );
+                                            let xrandr_result = std::process::Command::new("sh")
+                                                .arg("-c")
+                                                .arg(xrandr_command)
+                                                .output()
+                                                .expect("Failed to execute xrandr command");
+                                            println!("xrandr result: {:?}", xrandr_result);
+                                        }
+                                    } else if publish.payload.eq("OFF") {
+                                        println!("Turning off display");
+                                        client_arc_2
+                                            .publish(
+                                                &discovery_payload_arc.state_topic,
+                                                QoS::AtLeastOnce,
+                                                true,
+                                                "OFF",
+                                            )
+                                            .unwrap();
 
-                                    if let Some(xrandr) = &config.display.xrandr {
-                                        let xrandr_command = format!(
+                                        if let Some(xrandr) = &config.display.xrandr {
+                                            let xrandr_command = format!(
                                             "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off",
                                         );
+                                            let xrandr_result = std::process::Command::new("sh")
+                                                .arg("-c")
+                                                .arg(xrandr_command)
+                                                .output()
+                                                .expect("Failed to execute xrandr command");
+                                            println!("xrandr result: {:?}", xrandr_result);
+                                        }
+                                    }
+                                }
+
+                                if publish
+                                    .topic
+                                    .eq(&discovery_payload_brightness_arc.command_topic)
+                                {
+                                    println!("Command received: {:?}", &publish.payload);
+
+                                    // Convert bytes to string and parse as f32
+                                    let brightness_str = String::from_utf8_lossy(&publish.payload);
+                                    let brightness_value: f32 = brightness_str.parse().unwrap();
+                                    client_arc_2
+                                        .publish(
+                                            &discovery_payload_brightness_arc.state_topic,
+                                            QoS::AtLeastOnce,
+                                            true,
+                                            brightness_value.to_string().as_str(),
+                                        )
+                                        .unwrap();
+
+                                    if let Some(xrandr) = &config.display.xrandr {
+                                        let xrandr_command = format!(
+                                            "xrandr --output {} --brightness {}",
+                                            xrandr, brightness_value
+                                        );
+                                        println!("xrandr command: {}", xrandr_command);
                                         let xrandr_result = std::process::Command::new("sh")
                                             .arg("-c")
                                             .arg(xrandr_command)
@@ -219,44 +254,20 @@ async fn main() -> Result<()> {
                                     }
                                 }
                             }
-
-                            if publish
-                                .topic
-                                .eq(&discovery_payload_brightness_arc.command_topic)
-                            {
-                                println!("Command received: {:?}", &publish.payload);
-
-                                // Convert bytes to string and parse as f32
-                                let brightness_str = String::from_utf8_lossy(&publish.payload);
-                                let brightness_value: f32 = brightness_str.parse().unwrap();
-                                client_arc_2
-                                    .publish(
-                                        &discovery_payload_brightness_arc.state_topic,
-                                        QoS::AtLeastOnce,
-                                        true,
-                                        brightness_value.to_string().as_str(),
-                                    )
-                                    .unwrap();
-
-                                if let Some(xrandr) = &config.display.xrandr {
-                                    let xrandr_command = format!(
-                                        "xrandr --output {} --brightness {}",
-                                        xrandr, brightness_value
-                                    );
-                                    println!("xrandr command: {}", xrandr_command);
-                                    let xrandr_result = std::process::Command::new("sh")
-                                        .arg("-c")
-                                        .arg(xrandr_command)
-                                        .output()
-                                        .expect("Failed to execute xrandr command");
-                                    println!("xrandr result: {:?}", xrandr_result);
-                                }
-                            }
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
-                _ => {}
+            }
+            Err(e) => {
+                error_count += 1;
+                println!("Error: {:?}", e);
+
+                // if error_count > 10 {
+                    // println!("Too many errors, exiting");
+                    // break;
+                // }
             }
         }
     }
