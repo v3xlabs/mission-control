@@ -59,7 +59,7 @@ impl HassDeviceDiscoveryPayload {
             state_topic: format!(
                 "homeassistant/switch/{unique_id}_backlight/state",
                 unique_id = unique_id
-            ),
+            ), 
             command_topic: format!(
                 "homeassistant/switch/{unique_id}_backlight/set",
                 unique_id = unique_id

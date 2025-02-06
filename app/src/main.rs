@@ -158,7 +158,9 @@ async fn main() -> Result<()> {
                                         .unwrap();
 
                                     if let Some(xrandr) = &config.display.xrandr {
-                                        let xrandr_command = format!("xset dpms force on",);
+                                        let xrandr_command = format!(
+                                            "xset dpms force on && xset s off && xset -dpms",
+                                        );
                                         let xrandr_result = std::process::Command::new("sh")
                                             .arg("-c")
                                             .arg(xrandr_command)
@@ -178,7 +180,9 @@ async fn main() -> Result<()> {
                                         .unwrap();
 
                                     if let Some(xrandr) = &config.display.xrandr {
-                                        let xrandr_command = format!("xset dpms force off",);
+                                        let xrandr_command = format!(
+                                            "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off",
+                                        );
                                         let xrandr_result = std::process::Command::new("sh")
                                             .arg("-c")
                                             .arg(xrandr_command)
