@@ -243,7 +243,7 @@ impl HassEntity {
             name: "URL".to_string(),
             icon: "mdi:link".to_string(),
             unique_id: format!("{unique_id}_url", unique_id = unique_id),
-            device_class: "text".to_string(),
+            device_class: "select".to_string(),
             device: HassDevice {
                 identifiers: vec![unique_id.clone()],
                 name,
@@ -251,15 +251,15 @@ impl HassEntity {
                 serial_number: unique_id.clone(),
             },
             state_topic: format!(
-                "homeassistant/text/{unique_id}_url/state",
+                "homeassistant/select/{unique_id}_url/state",
                 unique_id = unique_id
             ),
             command_topic: format!(
-                "homeassistant/text/{unique_id}_url/set",
+                "homeassistant/select/{unique_id}_url/set",
                 unique_id = unique_id
             ),
             config_topic: format!(
-                "homeassistant/text/{unique_id}_url/config",
+                "homeassistant/select/{unique_id}_url/config",
                 unique_id = unique_id
             ),
             availability_topic,
@@ -315,7 +315,7 @@ impl HassEntity {
 
     pub fn update_state(&self, client: &Client, state: &str) {
         client
-            .publish(&self.state_topic, QoS::AtLeastOnce, true, state)
+            .publish(&self.state_topic, QoS::AtLeastOnce, true, state.to_string())
             .unwrap();
     }
 }

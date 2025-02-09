@@ -158,11 +158,13 @@ impl HassManager {
         self.backlight_entity.publish_config(&self.mqtt_client);
         self.playlist_entity.publish_config(&self.mqtt_client);
         self.tab_entity.publish_config(&self.mqtt_client);
+        // self.url_entity.publish_config(&self.mqtt_client);
 
         self.brightness_entity.subscribe(&self.mqtt_client);
         self.backlight_entity.subscribe(&self.mqtt_client);
         self.playlist_entity.subscribe(&self.mqtt_client);
         self.tab_entity.subscribe(&self.mqtt_client);
+        // self.url_entity.subscribe(&self.mqtt_client);
     }
 
     pub async fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
