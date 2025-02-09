@@ -1,4 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use futures::{channel::oneshot::{channel, Sender}, FutureExt};
+use tracing::info;
 
 use anyhow::Result;
 use async_std::{
@@ -20,6 +22,8 @@ pub struct ChromeController {
     pub current_playlist: Arc<Mutex<Option<String>>>,
     pub should_screen_capture: Arc<Mutex<bool>>,
     pub last_frame: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+
+    pub interrupt: Arc<Mutex<Option<Sender<()>>>>,
 }
 
 impl Default for ChromeController {
@@ -28,6 +32,7 @@ impl Default for ChromeController {
             current_playlist: Arc::new(Mutex::new(None)),
             should_screen_capture: Arc::new(Mutex::new(true)),
             last_frame: Arc::new(Mutex::new(HashMap::new())),
+            interrupt: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -59,13 +64,13 @@ impl ChromeController {
             .build()
             .unwrap();
 
-        println!("{:?}", browser_config);
+        info!("{:?}", browser_config);
 
         let (browser, mut handler) = Browser::launch(browser_config).await?;
 
         task::spawn(async move {
             while let Some(event) = handler.next().await {
-                println!("Event: {:?}", event);
+                info!("Event: {:?}", event);
             }
         });
 
@@ -107,10 +112,10 @@ impl ChromeController {
                         .await
                         .unwrap();
                     while let Some(frame) = events.next().await {
-                        // println!("Event: {:?}", frame);
+                        // info!("Event: {:?}", frame);
 
                         let frame_buf: &[u8] = frame.data.as_ref();
-                        println!("Received frame: {}", frame_buf.len());
+                        info!("Received frame: {}", frame_buf.len());
 
                         self_arc
                             .lock()
@@ -146,6 +151,8 @@ impl ChromeController {
 
         let mut current_tab = 0;
         loop {
+            let mut sleep_duration = Duration::from_secs(0);
+
             if let Some(playlists) = &config.playlists {
                 if let Some(playlist) = self.current_playlist.lock().await.as_ref() {
                     state.hass.playlist_entity.update_state(
@@ -157,7 +164,7 @@ impl ChromeController {
                         // TODO: implement playlist logic
                         if let Some(tab) = playlist_config.tabs.get(current_tab) {
                             if let Some(page) = pages.get(tab) {
-                                println!("Activated tab \"{}\"", tab);
+                                info!("Activated tab \"{}\"", tab);
                                 page.activate().await.unwrap();
 
                                 state
@@ -170,7 +177,7 @@ impl ChromeController {
                                     &config.tabs.as_ref().unwrap().get(tab).unwrap().url,
                                 );
                             } else {
-                                println!("On demand activating tab \"{}\"", tab);
+                                info!("On demand activating tab \"{}\"", tab);
                                 if let Some(tab_config) = config.tabs.as_ref().unwrap().get(tab) {
                                     let page = browser.new_page("about:blank").await?;
                                     page.execute(
@@ -194,38 +201,66 @@ impl ChromeController {
                                         .url_entity
                                         .update_state(&state.hass.mqtt_client, &tab_config.url);
                                 } else {
-                                    println!("Tab \"{}\" config not found", tab);
+                                    info!("Tab \"{}\" config not found", tab);
                                     current_tab = 0;
+                                    continue;
                                 }
                             }
                         } else {
-                            println!(
+                            info!(
                                 "Tab \"{}\" not found in playlist \"{}\"",
                                 current_tab, playlist
                             );
                             current_tab = 0;
+                            continue;
                         }
 
-                        sleep(Duration::from_secs(playlist_config.interval as u64)).await;
+                        // sleep(Duration::from_secs(playlist_config.interval as u64)).await;
+                        sleep_duration = Duration::from_secs(playlist_config.interval as u64);
                         current_tab += 1;
                         if current_tab >= playlist_config.tabs.len() {
                             current_tab = 0;
                         }
                     } else {
-                        println!("Playlist \"{}\" config not found", playlist);
-                        sleep(Duration::from_secs(10000)).await;
+                        info!("Playlist \"{}\" config not found", playlist);
+                        sleep_duration = Duration::from_secs(10000);
                     }
                 } else {
-                    println!("No playlist selected");
-                    sleep(Duration::from_secs(10000)).await;
+                    info!("No playlist selected");
+                    sleep_duration = Duration::from_secs(10000);
                 }
             } else {
                 // Wait a while before checking in again
-                sleep(Duration::from_secs(10000)).await;
+                // sleep(Duration::from_secs(10000)).await;
+                sleep_duration = Duration::from_secs(10000);
+            }
+
+            if sleep_duration == Duration::from_secs(0) {
+                info!("No sleep duration, continuing loop");
+                continue;
+            }
+
+            // await sleep or interrupt whichever triggers first
+            let (interrupt_tx, interrupt_rx) = channel::<()>();
+            self.interrupt.lock().await.replace(interrupt_tx);
+
+            let sleep_future = sleep(sleep_duration);
+            let interrupt_future = interrupt_rx;
+
+            futures::select! {
+                _ = sleep_future.fuse() => {
+                    // Sleep completed normally, continue loop
+                    info!("Sleep completed normally, continuing loop");
+                    continue;
+                }
+                _ = interrupt_future.fuse() => {
+                    // Received interrupt signal, break the loop
+                    info!("Received interrupt signal, stopping playlist");
+
+                    continue;
+                }
             }
         }
-
-        // Ok(())
     }
 
     pub async fn set_playlist(&self, playlist: String) {

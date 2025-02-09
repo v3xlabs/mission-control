@@ -29,3 +29,5 @@ chromiumoxide = "0.7.0"
 base64 = "0.22.1"
 async-stream = "0.3.6"
 bytes = { version = "1.10.0", features = ["serde"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["serde"] }

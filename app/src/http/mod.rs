@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use tracing::info;
 use anyhow::Result;
 use base64::Engine;
 use poem::{
@@ -31,7 +32,7 @@ async fn root() -> &'static str {
 
 #[handler]
 async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl IntoResponse {
-    format!("preview: {}", tab_id.0);
+    info!("preview: {}", tab_id.0);
 
     let last_frames = state.chrome.last_frame.lock().await;
     let body = last_frames.get(&tab_id.0).unwrap();
@@ -41,7 +42,7 @@ async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl Into
         .decode(body)
         .unwrap();
 
-    println!("body: {:?}", body.len());
+    info!("body: {:?}", body.len());
 
     Response::builder()
         .body(Body::from_bytes(body.clone().into()))

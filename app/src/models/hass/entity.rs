@@ -1,3 +1,4 @@
+use tracing::info;
 use bytes::Bytes;
 use rumqttc::{Client, QoS};
 use serde::{Deserialize, Serialize};
@@ -240,10 +241,10 @@ impl HassEntity {
 
     pub fn new_url(name: String, unique_id: String, availability_topic: String) -> Self {
         Self {
-            name: "URL".to_string(),
+            name: "Active Page".to_string(),
             icon: "mdi:link".to_string(),
             unique_id: format!("{unique_id}_url", unique_id = unique_id),
-            device_class: "select".to_string(),
+            device_class: "text".to_string(),
             device: HassDevice {
                 identifiers: vec![unique_id.clone()],
                 name,
@@ -251,15 +252,15 @@ impl HassEntity {
                 serial_number: unique_id.clone(),
             },
             state_topic: format!(
-                "homeassistant/select/{unique_id}_url/state",
+                "homeassistant/text/{unique_id}_url/state",
                 unique_id = unique_id
             ),
             command_topic: format!(
-                "homeassistant/select/{unique_id}_url/set",
+                "homeassistant/text/{unique_id}_url/set",
                 unique_id = unique_id
             ),
             config_topic: format!(
-                "homeassistant/select/{unique_id}_url/config",
+                "homeassistant/text/{unique_id}_url/config",
                 unique_id = unique_id
             ),
             availability_topic,
@@ -292,7 +293,7 @@ impl HassEntity {
     }
 
     pub fn handle_command(&self, client: &Client, state: &State, command: &Bytes) {
-        println!("Command received: {:?}", command);
+        info!("Command received: {:?}", command);
         let command: &[u8] = command.as_ref();
         let command_str: &str = std::str::from_utf8(command).unwrap();
 

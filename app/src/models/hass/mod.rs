@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use entity::HassEntity;
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
-
+use tracing::info;
 use crate::{config::Config, state::AppState};
 
 pub mod entity;
@@ -27,7 +27,7 @@ impl HassManager {
 
         let mqtt_url = mqtt_url.host_str().unwrap();
 
-        println!("MQTT URL: {}", mqtt_url);
+        info!("MQTT URL: {}", mqtt_url);
 
         let availability_topic = format!("homeassistant/device/{}/availability", config.device.id);
         let availability_lastwill = "offline";
@@ -47,7 +47,7 @@ impl HassManager {
 
         if let Some(username) = &config.homeassistant.mqtt_username {
             if let Some(password) = &config.homeassistant.mqtt_password {
-                println!(
+                info!(
                     "Setting credentials for MQTT connection {} {}",
                     username, password
                 );
@@ -62,7 +62,7 @@ impl HassManager {
             config.device.id.to_string(),
             availability_topic.to_string(),
             Some(|_state, new_state| {
-                println!("Brightness state changed: {}", new_state);
+                info!("Brightness state changed: {}", new_state);
             }),
         );
 
@@ -71,7 +71,7 @@ impl HassManager {
             config.device.id.to_string(),
             availability_topic.to_string(),
             Some(|state, new_state| {
-                println!("Backlight state changed: {}", new_state);
+                info!("Backlight state changed: {}", new_state);
 
                 if let Some(_xrandr) = &state.config.display.xrandr {
                     if new_state.eq("ON") {
@@ -82,7 +82,7 @@ impl HassManager {
                             .arg(xrandr_command)
                             .output()
                             .expect("Failed to execute xrandr command");
-                        println!("xrandr result: {:?}", xrandr_result);
+                        info!("xrandr result: {:?}", xrandr_result);
                     } else {
                         let xrandr_command = format!(
                             "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off",
@@ -92,7 +92,7 @@ impl HassManager {
                             .arg(xrandr_command)
                             .output()
                             .expect("Failed to execute xrandr command");
-                        println!("xrandr result: {:?}", xrandr_result);
+                        info!("xrandr result: {:?}", xrandr_result);
                     }
                 }
             }),
@@ -117,7 +117,7 @@ impl HassManager {
             availability_topic.to_string(),
             playlist_options,
             Some(|state, new_state| {
-                println!("Playlist state changed: {}", new_state);
+                info!("Playlist state changed: {}", new_state);
                 let new_state = new_state.to_string();
             }),
         );
@@ -158,7 +158,7 @@ impl HassManager {
         self.backlight_entity.publish_config(&self.mqtt_client);
         self.playlist_entity.publish_config(&self.mqtt_client);
         self.tab_entity.publish_config(&self.mqtt_client);
-        // self.url_entity.publish_config(&self.mqtt_client);
+        self.url_entity.publish_config(&self.mqtt_client);
 
         self.brightness_entity.subscribe(&self.mqtt_client);
         self.backlight_entity.subscribe(&self.mqtt_client);
@@ -171,7 +171,7 @@ impl HassManager {
         let mut error_count = 0;
 
         for (i, notification) in connection.iter().enumerate() {
-            println!("Notification: {:?}", notification);
+            info!("Notification: {:?}", notification);
 
             match notification {
                 Ok(payload) => {
@@ -179,10 +179,10 @@ impl HassManager {
                         Event::Incoming(event) => {
                             match event {
                                 Packet::Publish(publish) => {
-                                    println!("Publish: {:?}", &publish);
+                                    info!("Publish: {:?}", &publish);
 
                                     if publish.topic.eq(&self.brightness_entity.command_topic) {
-                                        println!("Command received: {:?}", &publish.payload);
+                                        info!("Command received: {:?}", &publish.payload);
                                         self.brightness_entity.handle_command(
                                             &self.mqtt_client,
                                             &state,
@@ -191,7 +191,7 @@ impl HassManager {
                                     }
 
                                     if publish.topic.eq(&self.backlight_entity.command_topic) {
-                                        println!("Command received: {:?}", &publish.payload);
+                                        info!("Command received: {:?}", &publish.payload);
                                         self.backlight_entity.handle_command(
                                             &self.mqtt_client,
                                             &state,
@@ -200,7 +200,7 @@ impl HassManager {
                                     }
 
                                     if publish.topic.eq(&self.playlist_entity.command_topic) {
-                                        println!("Command received: {:?}", &publish.payload);
+                                        info!("Command received: {:?}", &publish.payload);
                                         self.playlist_entity.handle_command(
                                             &self.mqtt_client,
                                             &state,
@@ -208,13 +208,16 @@ impl HassManager {
                                         );
                                         let payload = String::from_utf8_lossy(&publish.payload).to_string();
                                         state.chrome.set_playlist(payload).await;
+                                        if let Some(interrupt) = state.chrome.interrupt.lock().await.take() {
+                                            interrupt.send(()).unwrap();
+                                        }
                                     }
 
                                     // if publish.topic.eq(&self.discovery_payload_arc.command_topic) {
-                                    //     println!("Command received: {:?}", &publish.payload);
+                                    //     info!("Command received: {:?}", &publish.payload);
 
                                     //     if publish.payload.eq("ON") {
-                                    //         println!("Turning on display");
+                                    //         info!("Turning on display");
                                     //         state.hass.mqtt_client
                                     //             .publish(
                                     //                 &discovery_payload_arc.state_topic,
@@ -233,10 +236,10 @@ impl HassManager {
                                     //                 .arg(xrandr_command)
                                     //                 .output()
                                     //                 .expect("Failed to execute xrandr command");
-                                    //             println!("xrandr result: {:?}", xrandr_result);
+                                    //             info!("xrandr result: {:?}", xrandr_result);
                                     //         }
                                     //     } else if publish.payload.eq("OFF") {
-                                    //         println!("Turning off display");
+                                    //         info!("Turning off display");
                                     //         state.hass.mqtt_client
                                     //             .publish(
                                     //                 &discovery_payload_arc.state_topic,
@@ -255,7 +258,7 @@ impl HassManager {
                                     //                 .arg(xrandr_command)
                                     //                 .output()
                                     //                 .expect("Failed to execute xrandr command");
-                                    //             println!("xrandr result: {:?}", xrandr_result);
+                                    //             info!("xrandr result: {:?}", xrandr_result);
                                     //         }
                                     //     }
                                     // }
@@ -264,7 +267,7 @@ impl HassManager {
                                     //     .topic
                                     //     .eq(&discovery_payload_brightness_arc.command_topic)
                                     // {
-                                    //     println!("Command received: {:?}", &publish.payload);
+                                    //     info!("Command received: {:?}", &publish.payload);
 
                                     //     // Convert bytes to string and parse as f32
                                     //     let brightness_str = String::from_utf8_lossy(&publish.payload);
@@ -283,13 +286,13 @@ impl HassManager {
                                     //             "xrandr --output {} --brightness {}",
                                     //             xrandr, brightness_value
                                     //         );
-                                    //         println!("xrandr command: {}", xrandr_command);
+                                    //         info!("xrandr command: {}", xrandr_command);
                                     //         let xrandr_result = std::process::Command::new("sh")
                                     //             .arg("-c")
                                     //             .arg(xrandr_command)
                                     //             .output()
                                     //             .expect("Failed to execute xrandr command");
-                                    //         println!("xrandr result: {:?}", xrandr_result);
+                                    //         info!("xrandr result: {:?}", xrandr_result);
                                     //     }
                                     // }
                                 }
@@ -301,10 +304,10 @@ impl HassManager {
                 }
                 Err(e) => {
                     error_count += 1;
-                    println!("Error: {:?}", e);
+                    info!("Error: {:?}", e);
 
                     // if error_count > 10 {
-                    // println!("Too many errors, exiting");
+                    // info!("Too many errors, exiting");
                     // break;
                     // }
                 }
