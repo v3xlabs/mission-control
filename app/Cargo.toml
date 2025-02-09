@@ -28,3 +28,4 @@ rumqttc = "0.24.0"
 chromiumoxide = "0.7.0"
 base64 = "0.22.1"
 async-stream = "0.3.6"
+bytes = { version = "1.10.0", features = ["serde"] }

@@ -2438,6 +2438,7 @@ dependencies = [
  "async-std",
  "async-stream",
  "base64 0.22.1",
+ "bytes",
  "chromiumoxide",
  "dotenvy",
  "figment",

@@ -200,4 +200,8 @@ impl ChromeController {
 
         Ok(())
     }
+
+    pub async fn update_brightness(&self, brightness: u8) -> Result<()> {
+        
+    }
 }

@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use anyhow::Result;
 use async_std::task;
 use chrome::ChromeController;
-use models::hass::HassDeviceDiscoveryPayload;
+use models::hass::entity::HassEntity;
 use reqwest::Url;
 use rumqttc::{Client, Event, LastWill, MqttOptions, Packet, QoS};
 use state::AppState;
@@ -38,38 +38,34 @@ async fn main() -> Result<()> {
         }
     }
 
-    let device_discovery_topic = format!("homeassistant/device/{}/config", config.device.id);
+    // let device_discovery_topic = format!("homeassistant/device/{}/config", config.device.id);
 
-    let discovery_payload = HassDeviceDiscoveryPayload::new_backlight(
-        config.device.name.to_string(),
-        config.device.id.to_string(),
-        state.hass.availability_topic.to_string(),
-    );
-    let discovery_payload_brightness = HassDeviceDiscoveryPayload::new_brightness(
-        config.device.name.to_string(),
-        config.device.id.to_string(),
-        state.hass.availability_topic.to_string(),
-    );
-    let discovery_payload_str: String = serde_json::to_string(&discovery_payload).unwrap();
-    let discovery_payload_arc = Arc::new(discovery_payload);
-    let discovery_payload_brightness_str: String =
-        serde_json::to_string(&discovery_payload_brightness).unwrap();
-    let discovery_payload_brightness_arc = Arc::new(discovery_payload_brightness);
+    // let discovery_payload = HassDeviceDiscoveryPayload::new_backlight(
+    //     config.device.name.to_string(),
+    //     config.device.id.to_string(),
+    //     state.hass.availability_topic.to_string(),
+    // );
+   
+    // let discovery_payload_str: String = serde_json::to_string(&discovery_payload).unwrap();
+    // let discovery_payload_arc = Arc::new(discovery_payload);
+    // let discovery_payload_brightness_str: String =
+        // serde_json::to_string(&discovery_payload_brightness).unwrap();
+    // let discovery_payload_brightness_arc = Arc::new(discovery_payload_brightness);
 
     // post mqtt init
 
-    state.hass.mqtt_client
-        .subscribe(&discovery_payload_arc.command_topic, QoS::AtMostOnce)
-        .unwrap();
-    state.hass.mqtt_client
-        .subscribe(
-            &discovery_payload_brightness_arc.command_topic,
-            QoS::AtMostOnce,
-        )
-        .unwrap();
+    // state.hass.mqtt_client
+    //     .subscribe(&discovery_payload_arc.command_topic, QoS::AtMostOnce)
+    //     .unwrap();
+    // state.hass.mqtt_client
+    //     .subscribe(
+    //         &discovery_payload_brightness_arc.command_topic,
+    //         QoS::AtMostOnce,
+    //     )
+    //     .unwrap();
 
-    let discovery_payload_arc_2 = discovery_payload_arc.clone();
-    let discovery_payload_brightness_arc_2 = discovery_payload_brightness_arc.clone();
+    // let discovery_payload_arc_2 = discovery_payload_arc.clone();
+    // let discovery_payload_brightness_arc_2 = discovery_payload_brightness_arc.clone();
 
     state.hass.init().await;
 

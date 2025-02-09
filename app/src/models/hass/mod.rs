@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use entity::HassEntity;
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
 use serde::{Deserialize, Serialize};
@@ -7,10 +8,16 @@ use serde_json::Value;
 
 use crate::config::Config;
 
+pub mod entity;
+
 pub struct HassManager {
     // connection: Connection,
     pub mqtt_client: Client,
     pub availability_topic: String,
+
+    pub brightness_entity: HassEntity,
+    pub backlight_entity: HassEntity,
+    pub playlist_entity: HassEntity,
 }
 
 impl HassManager {
@@ -46,11 +53,46 @@ impl HassManager {
 
         let (mut client, mut connection) = Client::new(mqttoptions, 10);
 
+        let brightness_entity = HassEntity::new_brightness(
+            config.device.name.to_string(),
+            config.device.id.to_string(),
+            availability_topic.to_string(),
+        );
+
+        let backlight_entity = HassEntity::new_backlight(
+            config.device.name.to_string(),
+            config.device.id.to_string(),
+            availability_topic.to_string(),
+        );
+
+        let playlist_options = config.chromium.as_ref().map(|chromium| {
+            chromium
+                .playlists
+                .iter()
+                .flat_map(|playlist| {
+                    playlist
+                        .iter()
+                        .map(|(name, _)| name.to_string())
+                        .collect::<Vec<String>>()
+                })
+                .collect::<Vec<String>>()
+        });
+
+        let playlist_entity = HassEntity::new_playlist(
+            config.device.name.to_string(),
+            config.device.id.to_string(),
+            availability_topic.to_string(),
+            playlist_options,
+        );
+
         (
             Self {
                 mqtt_client: client,
                 // connection,
                 availability_topic,
+                brightness_entity,
+                backlight_entity,
+                playlist_entity,
             },
             connection,
         )
@@ -60,6 +102,14 @@ impl HassManager {
         self.mqtt_client
             .publish(&self.availability_topic, QoS::AtLeastOnce, true, "online")
             .unwrap();
+
+        self.brightness_entity.publish_config(&self.mqtt_client);
+        self.backlight_entity.publish_config(&self.mqtt_client);
+        self.playlist_entity.publish_config(&self.mqtt_client);
+
+        self.brightness_entity.subscribe(&self.mqtt_client);
+        self.backlight_entity.subscribe(&self.mqtt_client);
+        self.playlist_entity.subscribe(&self.mqtt_client);
     }
 
     pub fn run(&self, connection: &mut Connection) {
@@ -75,6 +125,21 @@ impl HassManager {
                             match event {
                                 Packet::Publish(publish) => {
                                     println!("Publish: {:?}", &publish);
+
+                                    if publish.topic.eq(&self.brightness_entity.command_topic) {
+                                        println!("Command received: {:?}", &publish.payload);
+                                        self.brightness_entity.handle_command(&self.mqtt_client, &publish.payload);
+                                    }
+
+                                    if publish.topic.eq(&self.backlight_entity.command_topic) {
+                                        println!("Command received: {:?}", &publish.payload);
+                                        self.backlight_entity.handle_command(&self.mqtt_client, &publish.payload);
+                                    }
+
+                                    if publish.topic.eq(&self.playlist_entity.command_topic) {
+                                        println!("Command received: {:?}", &publish.payload);
+                                        self.playlist_entity.handle_command(&self.mqtt_client, &publish.payload);
+                                    }
 
                                     // if publish.topic.eq(&self.discovery_payload_arc.command_topic) {
                                     //     println!("Command received: {:?}", &publish.payload);
@@ -177,146 +242,4 @@ impl HassManager {
             }
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HassDeviceDiscoveryPayload {
-    pub name: String,
-    pub icon: String,
-    pub unique_id: String,
-    // pub device_class: String,
-    pub device: HassDevice,
-    pub command_topic: String,
-    pub state_topic: String,
-
-    // Availability
-    pub availability_topic: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload_available: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload_not_available: Option<String>,
-
-    // Switch
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state_on: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state_off: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload_on: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload_off: Option<String>,
-
-    // Number
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub step: Option<f32>,
-
-    // Select
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub options: Option<Vec<String>>,
-
-    #[serde(skip)]
-    pub config_topic: String,
-
-    #[serde(flatten)]
-    pub extra: Option<Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HassDevice {
-    pub identifiers: Vec<String>,
-    pub name: String,
-    pub configuration_url: String,
-    pub serial_number: String,
-}
-
-impl HassDeviceDiscoveryPayload {
-    pub fn new_backlight(name: String, unique_id: String, availability_topic: String) -> Self {
-        Self {
-            name: format!("{name} Backlight", name = name),
-            icon: "mdi:monitor".to_string(),
-            unique_id: format!("{unique_id}_backlight", unique_id = unique_id),
-            // device_class: "switch".to_string(),
-            device: HassDevice {
-                identifiers: vec![unique_id.clone()],
-                name,
-                configuration_url: "https://v3x.fyi/s1".to_string(),
-                serial_number: unique_id.clone(),
-            },
-            state_topic: format!(
-                "homeassistant/switch/{unique_id}_backlight/state",
-                unique_id = unique_id
-            ),
-            command_topic: format!(
-                "homeassistant/switch/{unique_id}_backlight/set",
-                unique_id = unique_id
-            ),
-            config_topic: format!(
-                "homeassistant/switch/{unique_id}_backlight/config",
-                unique_id = unique_id
-            ),
-            availability_topic,
-            state_on: Some("ON".to_string()),
-            state_off: Some("OFF".to_string()),
-            payload_on: Some("ON".to_string()),
-            payload_off: Some("OFF".to_string()),
-            payload_available: Some("online".to_string()),
-            payload_not_available: Some("offline".to_string()),
-            min: None,
-            max: None,
-            step: None,
-            options: None,
-            extra: None,
-        }
-    }
-
-    pub fn new_brightness(name: String, unique_id: String, availability_topic: String) -> Self {
-        Self {
-            name: format!("{name} Brightness", name = name),
-            icon: "mdi:brightness-7".to_string(),
-            unique_id: format!("{unique_id}_brightness", unique_id = unique_id),
-            device: HassDevice {
-                identifiers: vec![unique_id.clone()],
-                name,
-                configuration_url: "https://v3x.fyi/s1".to_string(),
-                serial_number: unique_id.clone(),
-            },
-            state_topic: format!(
-                "homeassistant/number/{unique_id}_brightness/state",
-                unique_id = unique_id
-            ),
-            command_topic: format!(
-                "homeassistant/number/{unique_id}_brightness/set",
-                unique_id = unique_id
-            ),
-            config_topic: format!(
-                "homeassistant/number/{unique_id}_brightness/config",
-                unique_id = unique_id
-            ),
-            availability_topic,
-            state_on: None,
-            state_off: None,
-            payload_on: None,
-            payload_off: None,
-            payload_available: None,
-            payload_not_available: None,
-            min: Some(0.0),
-            max: Some(1.0),
-            step: Some(0.01),
-            options: None,
-            extra: None,
-        }
-    }
-
-    // pub fn new_playlist(name: String, unique_id: String, availability_topic: String) -> Self {
-    //     Self {
-    //         name: format!("{name} Playlist", name = name),
-    //         icon: "mdi:playlist-play".to_string(),
-    //         unique_id: format!("{unique_id}_playlist", unique_id = unique_id),
-
-    //     }
-    // }
 }
