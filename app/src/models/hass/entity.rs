@@ -3,7 +3,7 @@ use rumqttc::{Client, QoS};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::config::Config;
+use crate::{config::Config, state::State};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HassEntity {
@@ -47,7 +47,7 @@ pub struct HassEntity {
     #[serde(skip)]
     pub config_topic: String,
     #[serde(skip)]
-    pub on_change: Option<fn(config: &Config, state: &str)>,
+    pub on_change: Option<fn(state: &State, state: &str)>,
 
     #[serde(flatten)]
     pub extra: Option<Value>,
@@ -66,7 +66,7 @@ impl HassEntity {
         name: String,
         unique_id: String,
         availability_topic: String,
-        on_change: Option<fn(config: &Config, state: &str)>,
+        on_change: Option<fn(state: &State, state: &str)>,
     ) -> Self {
         Self {
             name: "Backlight".to_string(),
@@ -107,7 +107,12 @@ impl HassEntity {
         }
     }
 
-    pub fn new_brightness(name: String, unique_id: String, availability_topic: String) -> Self {
+    pub fn new_brightness(
+        name: String,
+        unique_id: String,
+        availability_topic: String,
+        on_change: Option<fn(state: &State, state: &str)>,
+    ) -> Self {
         Self {
             name: "Brightness".to_string(),
             icon: "mdi:brightness-7".to_string(),
@@ -152,6 +157,7 @@ impl HassEntity {
         unique_id: String,
         availability_topic: String,
         options: Option<Vec<String>>,
+        on_change: Option<fn(state: &State, state: &str)>,
     ) -> Self {
         Self {
             name: "Playlist".to_string(),
@@ -187,6 +193,50 @@ impl HassEntity {
             max: None,
             step: None,
             options,
+            on_change,
+            extra: None,
+        }
+    }
+
+    pub fn new_tab(
+        name: String,
+        unique_id: String,
+        availability_topic: String,
+    ) -> Self {
+        Self {
+            name: "Tab".to_string(),
+            icon: "mdi:tab".to_string(),
+            unique_id: format!("{unique_id}_tab", unique_id = unique_id),
+            device_class: "text".to_string(),
+            device: HassDevice {
+                identifiers: vec![unique_id.clone()],
+                name,
+                configuration_url: "https://v3x.fyi/s1".to_string(),
+                serial_number: unique_id.clone(),
+            },
+            state_topic: format!(
+                "homeassistant/text/{unique_id}_tab/state",
+                unique_id = unique_id
+            ),
+            command_topic: format!(
+                "homeassistant/text/{unique_id}_tab/set",
+                unique_id = unique_id
+            ),
+            config_topic: format!(
+                "homeassistant/text/{unique_id}_tab/config",
+                unique_id = unique_id
+            ),
+            availability_topic,
+            state_on: None,
+            state_off: None,
+            payload_on: None,
+            payload_off: None,
+            payload_available: None,
+            payload_not_available: None,
+            min: None,
+            max: None,
+            step: None,
+            options: None,
             on_change: None,
             extra: None,
         }
@@ -205,7 +255,7 @@ impl HassEntity {
             .unwrap();
     }
 
-    pub fn handle_command(&self, client: &Client, config: &Config, command: &Bytes) {
+    pub fn handle_command(&self, client: &Client, state: &State, command: &Bytes) {
         println!("Command received: {:?}", command);
         let command: &[u8] = command.as_ref();
         let command_str: &str = std::str::from_utf8(command).unwrap();
@@ -223,7 +273,7 @@ impl HassEntity {
         }
 
         if let Some(on_change) = &self.on_change.as_ref() {
-            on_change(config, command_str);
+            on_change(state, command_str);
         }
     }
 

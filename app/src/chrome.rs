@@ -200,4 +200,8 @@ impl ChromeController {
 
         // Ok(())
     }
+
+    pub async fn set_playlist(&self, playlist: String) {
+        self.current_playlist.lock().await.replace(playlist);
+    }
 }

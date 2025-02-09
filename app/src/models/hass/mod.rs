@@ -16,6 +16,7 @@ pub struct HassManager {
     pub brightness_entity: HassEntity,
     pub backlight_entity: HassEntity,
     pub playlist_entity: HassEntity,
+    pub tab_entity: HassEntity,
 }
 
 impl HassManager {
@@ -30,7 +31,11 @@ impl HassManager {
         let availability_topic = format!("homeassistant/device/{}/availability", config.device.id);
         let availability_lastwill = "offline";
 
-        let mut mqttoptions = MqttOptions::new("mission-control-1", mqtt_url, mqtt_port);
+        let mut mqttoptions = MqttOptions::new(
+            format!("mission-control-{}", config.device.id),
+            mqtt_url,
+            mqtt_port,
+        );
         mqttoptions.set_keep_alive(Duration::from_secs(15));
         mqttoptions.set_last_will(LastWill::new(
             &availability_topic,
@@ -55,20 +60,22 @@ impl HassManager {
             config.device.name.to_string(),
             config.device.id.to_string(),
             availability_topic.to_string(),
+            Some(|state, new_state| {
+                println!("Brightness state changed: {}", new_state);
+            }),
         );
 
         let backlight_entity = HassEntity::new_backlight(
             config.device.name.to_string(),
             config.device.id.to_string(),
             availability_topic.to_string(),
-            Some(|config, state| {
-                println!("Backlight state changed: {}", state);
+            Some(|state, new_state| {
+                println!("Backlight state changed: {}", new_state);
 
-                if let Some(xrandr) = &config.display.xrandr {
-                    if state.eq("ON") {
-                        let xrandr_command = format!(
-                            "xset dpms force on && xset s off && xset -dpms",
-                        );
+                if let Some(xrandr) = &state.config.display.xrandr {
+                    if new_state.eq("ON") {
+                        let xrandr_command =
+                            format!("xset dpms force on && xset s off && xset -dpms",);
                         let xrandr_result = std::process::Command::new("sh")
                             .arg("-c")
                             .arg(xrandr_command)
@@ -87,7 +94,7 @@ impl HassManager {
                         println!("xrandr result: {:?}", xrandr_result);
                     }
                 }
-            })
+            }),
         );
 
         let playlist_options = config.chromium.as_ref().map(|chromium| {
@@ -108,6 +115,17 @@ impl HassManager {
             config.device.id.to_string(),
             availability_topic.to_string(),
             playlist_options,
+            Some(|state, new_state| {
+                println!("Playlist state changed: {}", new_state);
+                let new_state = new_state.to_string();
+                let x = state.chrome.set_playlist(new_state);
+            }),
+        );
+
+        let tab_entity = HassEntity::new_tab(
+            config.device.name.to_string(),
+            config.device.id.to_string(),
+            availability_topic.to_string(),
         );
 
         (
@@ -118,6 +136,7 @@ impl HassManager {
                 brightness_entity,
                 backlight_entity,
                 playlist_entity,
+                tab_entity,
             },
             connection,
         )
@@ -131,10 +150,12 @@ impl HassManager {
         self.brightness_entity.publish_config(&self.mqtt_client);
         self.backlight_entity.publish_config(&self.mqtt_client);
         self.playlist_entity.publish_config(&self.mqtt_client);
+        self.tab_entity.publish_config(&self.mqtt_client);
 
         self.brightness_entity.subscribe(&self.mqtt_client);
         self.backlight_entity.subscribe(&self.mqtt_client);
         self.playlist_entity.subscribe(&self.mqtt_client);
+        self.tab_entity.subscribe(&self.mqtt_client);
     }
 
     pub fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
@@ -153,17 +174,29 @@ impl HassManager {
 
                                     if publish.topic.eq(&self.brightness_entity.command_topic) {
                                         println!("Command received: {:?}", &publish.payload);
-                                        self.brightness_entity.handle_command(&self.mqtt_client, &state.config, &publish.payload);
+                                        self.brightness_entity.handle_command(
+                                            &self.mqtt_client,
+                                            &state,
+                                            &publish.payload,
+                                        );
                                     }
 
                                     if publish.topic.eq(&self.backlight_entity.command_topic) {
                                         println!("Command received: {:?}", &publish.payload);
-                                        self.backlight_entity.handle_command(&self.mqtt_client, &state.config, &publish.payload);
+                                        self.backlight_entity.handle_command(
+                                            &self.mqtt_client,
+                                            &state,
+                                            &publish.payload,
+                                        );
                                     }
 
                                     if publish.topic.eq(&self.playlist_entity.command_topic) {
                                         println!("Command received: {:?}", &publish.payload);
-                                        self.playlist_entity.handle_command(&self.mqtt_client, &state.config, &publish.payload);
+                                        self.playlist_entity.handle_command(
+                                            &self.mqtt_client,
+                                            &state,
+                                            &publish.payload,
+                                        );
                                     }
 
                                     // if publish.topic.eq(&self.discovery_payload_arc.command_topic) {

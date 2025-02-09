@@ -4,6 +4,8 @@ use rumqttc::Connection;
 
 use crate::{chrome::ChromeController, config::Config, models::hass::HassManager};
 
+pub type State = Arc<AppState>;
+
 pub struct AppState {
     pub chrome: Arc<ChromeController>,
     pub hass: Arc<HassManager>,
