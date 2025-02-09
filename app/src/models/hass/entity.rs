@@ -3,7 +3,7 @@ use rumqttc::{Client, QoS};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{config::Config, state::State};
+use crate::state::State;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HassEntity {
@@ -198,11 +198,7 @@ impl HassEntity {
         }
     }
 
-    pub fn new_tab(
-        name: String,
-        unique_id: String,
-        availability_topic: String,
-    ) -> Self {
+    pub fn new_tab(name: String, unique_id: String, availability_topic: String) -> Self {
         Self {
             name: "Tab".to_string(),
             icon: "mdi:tab".to_string(),
@@ -224,6 +220,46 @@ impl HassEntity {
             ),
             config_topic: format!(
                 "homeassistant/text/{unique_id}_tab/config",
+                unique_id = unique_id
+            ),
+            availability_topic,
+            state_on: None,
+            state_off: None,
+            payload_on: None,
+            payload_off: None,
+            payload_available: None,
+            payload_not_available: None,
+            min: None,
+            max: None,
+            step: None,
+            options: None,
+            on_change: None,
+            extra: None,
+        }
+    }
+
+    pub fn new_url(name: String, unique_id: String, availability_topic: String) -> Self {
+        Self {
+            name: "URL".to_string(),
+            icon: "mdi:link".to_string(),
+            unique_id: format!("{unique_id}_url", unique_id = unique_id),
+            device_class: "text".to_string(),
+            device: HassDevice {
+                identifiers: vec![unique_id.clone()],
+                name,
+                configuration_url: "https://v3x.fyi/s1".to_string(),
+                serial_number: unique_id.clone(),
+            },
+            state_topic: format!(
+                "homeassistant/text/{unique_id}_url/state",
+                unique_id = unique_id
+            ),
+            command_topic: format!(
+                "homeassistant/text/{unique_id}_url/set",
+                unique_id = unique_id
+            ),
+            config_topic: format!(
+                "homeassistant/text/{unique_id}_url/config",
                 unique_id = unique_id
             ),
             availability_topic,

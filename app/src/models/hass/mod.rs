@@ -17,6 +17,7 @@ pub struct HassManager {
     pub backlight_entity: HassEntity,
     pub playlist_entity: HassEntity,
     pub tab_entity: HassEntity,
+    pub url_entity: HassEntity,
 }
 
 impl HassManager {
@@ -60,7 +61,7 @@ impl HassManager {
             config.device.name.to_string(),
             config.device.id.to_string(),
             availability_topic.to_string(),
-            Some(|state, new_state| {
+            Some(|_state, new_state| {
                 println!("Brightness state changed: {}", new_state);
             }),
         );
@@ -72,7 +73,7 @@ impl HassManager {
             Some(|state, new_state| {
                 println!("Backlight state changed: {}", new_state);
 
-                if let Some(xrandr) = &state.config.display.xrandr {
+                if let Some(_xrandr) = &state.config.display.xrandr {
                     if new_state.eq("ON") {
                         let xrandr_command =
                             format!("xset dpms force on && xset s off && xset -dpms",);
@@ -128,6 +129,12 @@ impl HassManager {
             availability_topic.to_string(),
         );
 
+        let url_entity = HassEntity::new_url(
+            config.device.name.to_string(),
+            config.device.id.to_string(),
+            availability_topic.to_string(),
+        );
+
         (
             Self {
                 mqtt_client: client,
@@ -137,6 +144,7 @@ impl HassManager {
                 backlight_entity,
                 playlist_entity,
                 tab_entity,
+                url_entity,
             },
             connection,
         )
