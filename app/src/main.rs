@@ -25,13 +25,15 @@ async fn main() -> Result<()> {
     let chromium = Arc::new(ChromeController::new());
 
     if let Some(chromium_config) = config.chromium {
-        let chromium_config_clone = chromium_config.clone();
+        if chromium_config.enabled {
+            let chromium_config_clone = chromium_config.clone();
 
-        let chromium_2 = chromium.clone();
+            let chromium_2 = chromium.clone();
 
-        task::spawn(async move {
-            chromium_2.start(&chromium_config_clone).await.unwrap();
-        });
+            task::spawn(async move {
+                chromium_2.start(&chromium_config_clone).await.unwrap();
+            });
+        }
     }
 
     let state = Arc::new(AppState { chrome: chromium });
@@ -265,8 +267,8 @@ async fn main() -> Result<()> {
                 println!("Error: {:?}", e);
 
                 // if error_count > 10 {
-                    // println!("Too many errors, exiting");
-                    // break;
+                // println!("Too many errors, exiting");
+                // break;
                 // }
             }
         }
