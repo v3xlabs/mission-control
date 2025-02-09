@@ -14,7 +14,7 @@ use chromiumoxide::{
     Browser, BrowserConfig, Page,
 };
 
-use crate::config::ChromiumConfig;
+use crate::{config::ChromiumConfig, state::State};
 
 pub struct ChromeController {
     pub current_playlist: Arc<Mutex<Option<String>>>,
@@ -37,7 +37,7 @@ impl ChromeController {
         Self::default()
     }
 
-    pub async fn start(&self, config: &ChromiumConfig) -> Result<()> {
+    pub async fn start(&self, config: &ChromiumConfig, state: &State) -> Result<()> {
         let home_path = std::env::var("HOME").unwrap();
         let user_data_dir = format!("{}/.chromium-mission-data", home_path);
         let browser_config = BrowserConfig::builder()
@@ -148,12 +148,27 @@ impl ChromeController {
         loop {
             if let Some(playlists) = &config.playlists {
                 if let Some(playlist) = self.current_playlist.lock().await.as_ref() {
+                    state.hass.playlist_entity.update_state(
+                        &state.hass.mqtt_client,
+                        playlist,
+                    );
+
                     if let Some(playlist_config) = playlists.get(playlist) {
                         // TODO: implement playlist logic
                         if let Some(tab) = playlist_config.tabs.get(current_tab) {
                             if let Some(page) = pages.get(tab) {
                                 println!("Activated tab \"{}\"", tab);
                                 page.activate().await.unwrap();
+
+                                state
+                                    .hass
+                                    .tab_entity
+                                    .update_state(&state.hass.mqtt_client, tab);
+
+                                state.hass.url_entity.update_state(
+                                    &state.hass.mqtt_client,
+                                    &config.tabs.as_ref().unwrap().get(tab).unwrap().url,
+                                );
                             } else {
                                 println!("On demand activating tab \"{}\"", tab);
                                 if let Some(tab_config) = config.tabs.as_ref().unwrap().get(tab) {
@@ -166,6 +181,18 @@ impl ChromeController {
                                     )
                                     .await
                                     .unwrap();
+
+                                    // TODO: update tab entity
+                                    state
+                                        .hass
+                                        .tab_entity
+                                        .update_state(&state.hass.mqtt_client, tab);
+
+                                    // TODO: update url entity
+                                    state
+                                        .hass
+                                        .url_entity
+                                        .update_state(&state.hass.mqtt_client, &tab_config.url);
                                 } else {
                                     println!("Tab \"{}\" config not found", tab);
                                     current_tab = 0;

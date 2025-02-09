@@ -25,11 +25,12 @@ async fn main() -> Result<()> {
     if let Some(chromium_config) = &state.config.chromium {
         if chromium_config.enabled {
             let chromium_config_clone = chromium_config.clone();
+            let state_clone = state.clone();
 
             let chromium_2 = chromium.clone();
 
             task::spawn(async move {
-                chromium_2.start(&chromium_config_clone).await.unwrap();
+                chromium_2.start(&chromium_config_clone, &state_clone).await.unwrap();
             });
         }
     }
