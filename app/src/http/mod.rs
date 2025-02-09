@@ -1,7 +1,6 @@
-use std::{convert::Infallible, ops::Deref, str::Bytes, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
-use async_std::task;
 use base64::Engine;
 use poem::{
     get, handler,

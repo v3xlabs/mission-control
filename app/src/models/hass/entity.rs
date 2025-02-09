@@ -3,6 +3,8 @@ use rumqttc::{Client, QoS};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::config::Config;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HassEntity {
     pub name: String,
@@ -44,6 +46,8 @@ pub struct HassEntity {
 
     #[serde(skip)]
     pub config_topic: String,
+    #[serde(skip)]
+    pub on_change: Option<fn(config: &Config, state: &str)>,
 
     #[serde(flatten)]
     pub extra: Option<Value>,
@@ -58,7 +62,12 @@ pub struct HassDevice {
 }
 
 impl HassEntity {
-    pub fn new_backlight(name: String, unique_id: String, availability_topic: String) -> Self {
+    pub fn new_backlight(
+        name: String,
+        unique_id: String,
+        availability_topic: String,
+        on_change: Option<fn(config: &Config, state: &str)>,
+    ) -> Self {
         Self {
             name: "Backlight".to_string(),
             icon: "mdi:monitor".to_string(),
@@ -93,6 +102,7 @@ impl HassEntity {
             max: None,
             step: None,
             options: None,
+            on_change,
             extra: None,
         }
     }
@@ -132,6 +142,7 @@ impl HassEntity {
             max: Some(1.0),
             step: Some(0.01),
             options: None,
+            on_change: None,
             extra: None,
         }
     }
@@ -176,6 +187,7 @@ impl HassEntity {
             max: None,
             step: None,
             options,
+            on_change: None,
             extra: None,
         }
     }
@@ -193,9 +205,10 @@ impl HassEntity {
             .unwrap();
     }
 
-    pub fn handle_command(&self, client: &Client, command: &Bytes) {
+    pub fn handle_command(&self, client: &Client, config: &Config, command: &Bytes) {
         println!("Command received: {:?}", command);
         let command: &[u8] = command.as_ref();
+        let command_str: &str = std::str::from_utf8(command).unwrap();
 
         if self.device_class == "switch" {
             if command.eq(b"ON") {
@@ -204,11 +217,13 @@ impl HassEntity {
                 self.update_state(client, "OFF");
             }
         } else if self.device_class == "number" {
-            let command: &str = std::str::from_utf8(command).unwrap();
-            self.update_state(client, command);
+            self.update_state(client, command_str);
         } else if self.device_class == "select" {
-            let command: &str = std::str::from_utf8(command).unwrap();
-            self.update_state(client, command);
+            self.update_state(client, command_str);
+        }
+
+        if let Some(on_change) = &self.on_change.as_ref() {
+            on_change(config, command_str);
         }
     }
 

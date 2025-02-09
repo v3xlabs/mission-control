@@ -1,12 +1,10 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use entity::HassEntity;
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::config::Config;
+use crate::{config::Config, state::AppState};
 
 pub mod entity;
 
@@ -63,6 +61,33 @@ impl HassManager {
             config.device.name.to_string(),
             config.device.id.to_string(),
             availability_topic.to_string(),
+            Some(|config, state| {
+                println!("Backlight state changed: {}", state);
+
+                if let Some(xrandr) = &config.display.xrandr {
+                    if state.eq("ON") {
+                        let xrandr_command = format!(
+                            "xset dpms force on && xset s off && xset -dpms",
+                        );
+                        let xrandr_result = std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(xrandr_command)
+                            .output()
+                            .expect("Failed to execute xrandr command");
+                        println!("xrandr result: {:?}", xrandr_result);
+                    } else {
+                        let xrandr_command = format!(
+                            "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off",
+                        );
+                        let xrandr_result = std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(xrandr_command)
+                            .output()
+                            .expect("Failed to execute xrandr command");
+                        println!("xrandr result: {:?}", xrandr_result);
+                    }
+                }
+            })
         );
 
         let playlist_options = config.chromium.as_ref().map(|chromium| {
@@ -112,7 +137,7 @@ impl HassManager {
         self.playlist_entity.subscribe(&self.mqtt_client);
     }
 
-    pub fn run(&self, connection: &mut Connection) {
+    pub fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
         let mut error_count = 0;
 
         for (i, notification) in connection.iter().enumerate() {
@@ -128,17 +153,17 @@ impl HassManager {
 
                                     if publish.topic.eq(&self.brightness_entity.command_topic) {
                                         println!("Command received: {:?}", &publish.payload);
-                                        self.brightness_entity.handle_command(&self.mqtt_client, &publish.payload);
+                                        self.brightness_entity.handle_command(&self.mqtt_client, &state.config, &publish.payload);
                                     }
 
                                     if publish.topic.eq(&self.backlight_entity.command_topic) {
                                         println!("Command received: {:?}", &publish.payload);
-                                        self.backlight_entity.handle_command(&self.mqtt_client, &publish.payload);
+                                        self.backlight_entity.handle_command(&self.mqtt_client, &state.config, &publish.payload);
                                     }
 
                                     if publish.topic.eq(&self.playlist_entity.command_topic) {
                                         println!("Command received: {:?}", &publish.payload);
-                                        self.playlist_entity.handle_command(&self.mqtt_client, &publish.payload);
+                                        self.playlist_entity.handle_command(&self.mqtt_client, &state.config, &publish.payload);
                                     }
 
                                     // if publish.topic.eq(&self.discovery_payload_arc.command_topic) {

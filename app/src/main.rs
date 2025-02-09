@@ -1,11 +1,7 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anyhow::Result;
 use async_std::task;
-use chrome::ChromeController;
-use models::hass::entity::HassEntity;
-use reqwest::Url;
-use rumqttc::{Client, Event, LastWill, MqttOptions, Packet, QoS};
 use state::AppState;
 
 pub mod chrome;
@@ -22,11 +18,11 @@ async fn main() -> Result<()> {
 
     println!("Config: {:?}", config);
 
-    let (state, mut connection) = AppState::new(&config).await;
+    let (state, mut connection) = AppState::new(config).await;
     let state = Arc::new(state);
     let chromium = state.chrome.clone();
 
-    if let Some(chromium_config) = config.chromium {
+    if let Some(chromium_config) = &state.config.chromium {
         if chromium_config.enabled {
             let chromium_config_clone = chromium_config.clone();
 
@@ -45,11 +41,11 @@ async fn main() -> Result<()> {
     //     config.device.id.to_string(),
     //     state.hass.availability_topic.to_string(),
     // );
-   
+
     // let discovery_payload_str: String = serde_json::to_string(&discovery_payload).unwrap();
     // let discovery_payload_arc = Arc::new(discovery_payload);
     // let discovery_payload_brightness_str: String =
-        // serde_json::to_string(&discovery_payload_brightness).unwrap();
+    // serde_json::to_string(&discovery_payload_brightness).unwrap();
     // let discovery_payload_brightness_arc = Arc::new(discovery_payload_brightness);
 
     // post mqtt init
@@ -126,8 +122,7 @@ async fn main() -> Result<()> {
         http::start_http(http_state).await.unwrap();
     });
 
-    state.hass.run(&mut connection);
+    state.hass.run(&mut connection, &state);
 
     Ok(())
 }
-

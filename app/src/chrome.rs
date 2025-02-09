@@ -135,7 +135,7 @@ impl ChromeController {
         }
 
         if let Some(playlists) = &config.playlists {
-            if let Some((playlist_name, playlist_config)) = playlists.iter().next() {
+            if let Some((playlist_name, _playlist_config)) = playlists.iter().next() {
                 // this is now the default playlist
                 self.current_playlist
                     .lock()
@@ -198,10 +198,6 @@ impl ChromeController {
             }
         }
 
-        Ok(())
-    }
-
-    pub async fn update_brightness(&self, brightness: u8) -> Result<()> {
-        
+        // Ok(())
     }
 }
