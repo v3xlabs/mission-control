@@ -119,7 +119,6 @@ impl HassManager {
             Some(|state, new_state| {
                 println!("Playlist state changed: {}", new_state);
                 let new_state = new_state.to_string();
-                let x = state.chrome.set_playlist(new_state);
             }),
         );
 
@@ -166,7 +165,7 @@ impl HassManager {
         self.tab_entity.subscribe(&self.mqtt_client);
     }
 
-    pub fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
+    pub async fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
         let mut error_count = 0;
 
         for (i, notification) in connection.iter().enumerate() {
@@ -205,6 +204,8 @@ impl HassManager {
                                             &state,
                                             &publish.payload,
                                         );
+                                        let payload = String::from_utf8_lossy(&publish.payload).to_string();
+                                        state.chrome.set_playlist(payload).await;
                                     }
 
                                     // if publish.topic.eq(&self.discovery_payload_arc.command_topic) {

@@ -123,7 +123,7 @@ async fn main() -> Result<()> {
         http::start_http(http_state).await.unwrap();
     });
 
-    state.hass.run(&mut connection, &state);
+    state.hass.run(&mut connection, &state).await;
 
     Ok(())
 }
