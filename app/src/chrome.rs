@@ -1,5 +1,8 @@
+use futures::{
+    channel::oneshot::{channel, Sender},
+    FutureExt,
+};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use futures::{channel::oneshot::{channel, Sender}, FutureExt};
 use tracing::info;
 
 use anyhow::Result;
@@ -45,7 +48,9 @@ impl ChromeController {
     pub async fn start(&self, config: &ChromiumConfig, state: &State) -> Result<()> {
         let home_path = std::env::var("HOME").unwrap();
         let user_data_dir = format!("{}/.chromium-mission-data", home_path);
-        let browser_config = BrowserConfig::builder()
+        let browser_config = BrowserConfig::builder();
+
+        let mut browser_config = browser_config
             .chrome_executable(config.binary_path.clone().unwrap_or("chromium".to_string()))
             .disable_default_args()
             .with_head()
@@ -60,9 +65,17 @@ impl ChromeController {
             .port(9222)
             .arg("--no-first-run")
             .arg("--password-store=basic")
-            .viewport(None)
-            .build()
-            .unwrap();
+            .viewport(None);
+
+        let theme = config.theme.as_deref().unwrap_or("dark");
+
+        if theme == "light" {
+            browser_config = browser_config.arg(" --disable-features=WebContentsForceDark");
+        } else if theme == "dark" {
+            browser_config = browser_config.arg(" --enable-features=WebContentsForceDark:inversion_method/cielab_based/image_behavior/selective/text_lightness_threshold/150/background_lightness_threshold/205");
+        }
+
+        let browser_config = browser_config.build().unwrap();
 
         info!("{:?}", browser_config);
 
@@ -155,10 +168,10 @@ impl ChromeController {
 
             if let Some(playlists) = &config.playlists {
                 if let Some(playlist) = self.current_playlist.lock().await.as_ref() {
-                    state.hass.playlist_entity.update_state(
-                        &state.hass.mqtt_client,
-                        playlist,
-                    );
+                    state
+                        .hass
+                        .playlist_entity
+                        .update_state(&state.hass.mqtt_client, playlist);
 
                     if let Some(playlist_config) = playlists.get(playlist) {
                         // TODO: implement playlist logic

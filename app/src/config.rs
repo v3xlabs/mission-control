@@ -35,6 +35,7 @@ pub struct DisplayConfig {
 pub struct ChromiumConfig {
     pub enabled: bool,
     pub binary_path: Option<String>,
+    pub theme: Option<String>,
     pub tabs: Option<HashMap<String, ChromiumTabConfig>>,
     pub playlists: Option<HashMap<String, ChromiumPlaylistConfig>>,
 }
