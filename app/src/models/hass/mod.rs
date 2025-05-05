@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{config::Config, state::AppState};
 use entity::HassEntity;
+use futures::SinkExt;
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
 use tracing::info;
@@ -55,7 +56,7 @@ impl HassManager {
             }
         }
 
-        let (mut client, mut connection) = Client::new(mqttoptions, 10);
+        let (client, connection) = Client::new(mqttoptions, 10);
 
         let brightness_entity = HassEntity::new_brightness(
             config.device.name.to_string(),
@@ -116,9 +117,9 @@ impl HassManager {
             config.device.id.to_string(),
             availability_topic.to_string(),
             playlist_options,
-            Some(|state, new_state| {
+            Some(|_state, new_state| {
                 info!("Playlist state changed: {}", new_state);
-                let new_state = new_state.to_string();
+                // let new_state = new_state.to_string();
             }),
         );
 
@@ -175,134 +176,41 @@ impl HassManager {
 
             match notification {
                 Ok(payload) => {
-                    match payload {
-                        Event::Incoming(event) => {
-                            match event {
-                                Packet::Publish(publish) => {
-                                    info!("Publish: {:?}", &publish);
+                    if let Event::Incoming(event) = payload {
+                        if let Packet::Publish(publish) = event {
+                            info!("Publish: {:?}", &publish);
 
-                                    if publish.topic.eq(&self.brightness_entity.command_topic) {
-                                        info!("Command received: {:?}", &publish.payload);
-                                        self.brightness_entity.handle_command(
-                                            &self.mqtt_client,
-                                            &state,
-                                            &publish.payload,
-                                        );
-                                    }
+                            if publish.topic.eq(&self.brightness_entity.command_topic) {
+                                info!("Command received: {:?}", &publish.payload);
+                                self.brightness_entity.handle_command(
+                                    &self.mqtt_client,
+                                    &state,
+                                    &publish.payload,
+                                );
+                            }
 
-                                    if publish.topic.eq(&self.backlight_entity.command_topic) {
-                                        info!("Command received: {:?}", &publish.payload);
-                                        self.backlight_entity.handle_command(
-                                            &self.mqtt_client,
-                                            &state,
-                                            &publish.payload,
-                                        );
-                                    }
+                            if publish.topic.eq(&self.backlight_entity.command_topic) {
+                                info!("Command received: {:?}", &publish.payload);
+                                self.backlight_entity.handle_command(
+                                    &self.mqtt_client,
+                                    &state,
+                                    &publish.payload,
+                                );
+                            }
 
-                                    if publish.topic.eq(&self.playlist_entity.command_topic) {
-                                        info!("Command received: {:?}", &publish.payload);
-                                        self.playlist_entity.handle_command(
-                                            &self.mqtt_client,
-                                            &state,
-                                            &publish.payload,
-                                        );
-                                        let payload =
-                                            String::from_utf8_lossy(&publish.payload).to_string();
-                                        state.chrome.set_playlist(payload).await;
-                                        if let Some(interrupt) =
-                                            state.chrome.interrupt.lock().await.take()
-                                        {
-                                            interrupt.send(()).unwrap();
-                                        }
-                                    }
-
-                                    // if publish.topic.eq(&self.discovery_payload_arc.command_topic) {
-                                    //     info!("Command received: {:?}", &publish.payload);
-
-                                    //     if publish.payload.eq("ON") {
-                                    //         info!("Turning on display");
-                                    //         state.hass.mqtt_client
-                                    //             .publish(
-                                    //                 &discovery_payload_arc.state_topic,
-                                    //                 QoS::AtLeastOnce,
-                                    //                 true,
-                                    //                 "ON",
-                                    //             )
-                                    //             .unwrap();
-
-                                    //         if let Some(xrandr) = &config.display.xrandr {
-                                    //             let xrandr_command = format!(
-                                    //                 "xset dpms force on && xset s off && xset -dpms",
-                                    //             );
-                                    //             let xrandr_result = std::process::Command::new("sh")
-                                    //                 .arg("-c")
-                                    //                 .arg(xrandr_command)
-                                    //                 .output()
-                                    //                 .expect("Failed to execute xrandr command");
-                                    //             info!("xrandr result: {:?}", xrandr_result);
-                                    //         }
-                                    //     } else if publish.payload.eq("OFF") {
-                                    //         info!("Turning off display");
-                                    //         state.hass.mqtt_client
-                                    //             .publish(
-                                    //                 &discovery_payload_arc.state_topic,
-                                    //                 QoS::AtLeastOnce,
-                                    //                 true,
-                                    //                 "OFF",
-                                    //             )
-                                    //             .unwrap();
-
-                                    //         if let Some(xrandr) = &config.display.xrandr {
-                                    //             let xrandr_command = format!(
-                                    //             "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off",
-                                    //         );
-                                    //             let xrandr_result = std::process::Command::new("sh")
-                                    //                 .arg("-c")
-                                    //                 .arg(xrandr_command)
-                                    //                 .output()
-                                    //                 .expect("Failed to execute xrandr command");
-                                    //             info!("xrandr result: {:?}", xrandr_result);
-                                    //         }
-                                    //     }
-                                    // }
-
-                                    // if publish
-                                    //     .topic
-                                    //     .eq(&discovery_payload_brightness_arc.command_topic)
-                                    // {
-                                    //     info!("Command received: {:?}", &publish.payload);
-
-                                    //     // Convert bytes to string and parse as f32
-                                    //     let brightness_str = String::from_utf8_lossy(&publish.payload);
-                                    //     let brightness_value: f32 = brightness_str.parse().unwrap();
-                                    //     state.hass.mqtt_client
-                                    //         .publish(
-                                    //             &discovery_payload_brightness_arc.state_topic,
-                                    //             QoS::AtLeastOnce,
-                                    //             true,
-                                    //             brightness_value.to_string().as_str(),
-                                    //         )
-                                    //         .unwrap();
-
-                                    //     if let Some(xrandr) = &config.display.xrandr {
-                                    //         let xrandr_command = format!(
-                                    //             "xrandr --output {} --brightness {}",
-                                    //             xrandr, brightness_value
-                                    //         );
-                                    //         info!("xrandr command: {}", xrandr_command);
-                                    //         let xrandr_result = std::process::Command::new("sh")
-                                    //             .arg("-c")
-                                    //             .arg(xrandr_command)
-                                    //             .output()
-                                    //             .expect("Failed to execute xrandr command");
-                                    //         info!("xrandr result: {:?}", xrandr_result);
-                                    //     }
-                                    // }
-                                }
-                                _ => {}
+                            if publish.topic.eq(&self.playlist_entity.command_topic) {
+                                info!("Command received: {:?}", &publish.payload);
+                                self.playlist_entity.handle_command(
+                                    &self.mqtt_client,
+                                    &state,
+                                    &publish.payload,
+                                );
+                                let payload =
+                                    String::from_utf8_lossy(&publish.payload).to_string();
+                                state.chrome.set_playlist(payload).await;
+                                state.chrome.interrupt_sender.lock().await.send(()).await.unwrap();
                             }
                         }
-                        _ => {}
                     }
                 }
                 Err(e) => {

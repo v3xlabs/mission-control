@@ -1,6 +1,6 @@
 use futures::{
-    channel::oneshot::{channel, Sender},
-    FutureExt,
+    channel::mpsc::{channel, Receiver, Sender},
+    pin_mut, FutureExt,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::info;
@@ -19,23 +19,32 @@ use chromiumoxide::{
     Browser, BrowserConfig, Page,
 };
 
-use crate::{config::ChromiumConfig, state::State};
+use crate::{
+    config::ChromiumConfig,
+    state::{AppState, State},
+};
 
 pub struct ChromeController {
     pub current_playlist: Arc<Mutex<Option<String>>>,
     pub should_screen_capture: Arc<Mutex<bool>>,
     pub last_frame: Arc<Mutex<HashMap<String, Vec<u8>>>>,
 
-    pub interrupt: Arc<Mutex<Option<Sender<()>>>>,
+    pub interrupt_sender: Arc<Mutex<Sender<()>>>,
+    pub interrupt_receiver: Arc<Mutex<Receiver<()>>>,
+    pub pages: Arc<Mutex<HashMap<String, Page>>>,
 }
 
 impl Default for ChromeController {
     fn default() -> Self {
+        let (interrupt_sender, interrupt_receiver) = channel(1);
+
         Self {
             current_playlist: Arc::new(Mutex::new(None)),
             should_screen_capture: Arc::new(Mutex::new(true)),
             last_frame: Arc::new(Mutex::new(HashMap::new())),
-            interrupt: Arc::new(Mutex::new(None)),
+            interrupt_sender: Arc::new(Mutex::new(interrupt_sender)),
+            interrupt_receiver: Arc::new(Mutex::new(interrupt_receiver)),
+            pages: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -90,8 +99,6 @@ impl ChromeController {
         sleep(Duration::from_secs(2)).await;
 
         // Open all tabs that should be persisted
-        let mut pages: HashMap<String, Page> = HashMap::new();
-
         let tabs = config.tabs.clone();
 
         if let Some(tabs) = tabs {
@@ -148,7 +155,7 @@ impl ChromeController {
                     }
                 });
 
-                pages.insert(key.clone(), page);
+                self.pages.lock().await.insert(key.clone(), page);
             }
         }
 
@@ -162,9 +169,15 @@ impl ChromeController {
             }
         }
 
+        self.run(config, state, &browser).await;
+
+        Ok(())
+    }
+
+    pub async fn run(&self, config: &ChromiumConfig, state: &Arc<AppState>, browser: &Browser) {
         let mut current_tab = 0;
         loop {
-            let mut sleep_duration = Duration::from_secs(0);
+            let mut sleep_duration = Duration::from_secs(10000);
 
             if let Some(playlists) = &config.playlists {
                 if let Some(playlist) = self.current_playlist.lock().await.as_ref() {
@@ -176,7 +189,7 @@ impl ChromeController {
                     if let Some(playlist_config) = playlists.get(playlist) {
                         // TODO: implement playlist logic
                         if let Some(tab) = playlist_config.tabs.get(current_tab) {
-                            if let Some(page) = pages.get(tab) {
+                            if let Some(page) = self.pages.lock().await.get(tab) {
                                 info!("Activated tab \"{}\"", tab);
                                 page.activate().await.unwrap();
 
@@ -192,7 +205,7 @@ impl ChromeController {
                             } else {
                                 info!("On demand activating tab \"{}\"", tab);
                                 if let Some(tab_config) = config.tabs.as_ref().unwrap().get(tab) {
-                                    let page = browser.new_page("about:blank").await?;
+                                    let page = browser.new_page("about:blank").await.unwrap();
                                     page.execute(
                                         NavigateParams::builder()
                                             .url(tab_config.url.clone())
@@ -242,10 +255,6 @@ impl ChromeController {
                     info!("No playlist selected");
                     sleep_duration = Duration::from_secs(10000);
                 }
-            } else {
-                // Wait a while before checking in again
-                // sleep(Duration::from_secs(10000)).await;
-                sleep_duration = Duration::from_secs(10000);
             }
 
             if sleep_duration == Duration::from_secs(0) {
@@ -253,23 +262,23 @@ impl ChromeController {
                 continue;
             }
 
-            // await sleep or interrupt whichever triggers first
-            let (interrupt_tx, interrupt_rx) = channel::<()>();
-            self.interrupt.lock().await.replace(interrupt_tx);
+            let sleep_future = sleep(sleep_duration).fuse();
+            use futures::pin_mut;
 
-            let sleep_future = sleep(sleep_duration);
-            let interrupt_future = interrupt_rx;
+            pin_mut!(sleep_future);
+            let mut interrupt_receiver = self.interrupt_receiver.lock().await;
+            let interrupt_future = interrupt_receiver.next().fuse();
+            pin_mut!(interrupt_future);
 
             futures::select! {
-                _ = sleep_future.fuse() => {
+                _ = sleep_future => {
                     // Sleep completed normally, continue loop
                     info!("Sleep completed normally, continuing loop");
                     continue;
                 }
-                _ = interrupt_future.fuse() => {
+                _ = interrupt_future => {
                     // Received interrupt signal, break the loop
                     info!("Received interrupt signal, stopping playlist");
-
                     continue;
                 }
             }
