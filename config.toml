@@ -1,7 +1,14 @@
-[homeassistant]
-mqtt_url = "mqtt://localhost:1883"
-mqtt_username = "username"
-mqtt_password = "password"
+#:schema ./schema2.json
+
+# [homeassistant]
+# mqtt_url = "mqtt://localhost:1883"
+# mqtt_username = "username"
+# mqtt_password = "password"
+
+[homeassistant.mqtt]
+url = "mqtt://localhost:1883"
+username = "username"
+password = "password"
 
 [device]
 name = "My Display"

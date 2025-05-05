@@ -1,10 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
+use crate::{config::Config, state::AppState};
 use entity::HassEntity;
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
 use tracing::info;
-use crate::{config::Config, state::AppState};
 
 pub mod entity;
 
@@ -22,7 +22,7 @@ pub struct HassManager {
 
 impl HassManager {
     pub async fn new(config: &Config) -> (Self, Connection) {
-        let mqtt_url = config.homeassistant.mqtt_url.parse::<Url>().unwrap();
+        let mqtt_url = config.homeassistant.mqtt.url.parse::<Url>().unwrap();
         let mqtt_port = mqtt_url.port().unwrap_or(1883);
 
         let mqtt_url = mqtt_url.host_str().unwrap();
@@ -45,8 +45,8 @@ impl HassManager {
             true,
         ));
 
-        if let Some(username) = &config.homeassistant.mqtt_username {
-            if let Some(password) = &config.homeassistant.mqtt_password {
+        if let Some(username) = &config.homeassistant.mqtt.username {
+            if let Some(password) = &config.homeassistant.mqtt.password {
                 info!(
                     "Setting credentials for MQTT connection {} {}",
                     username, password
@@ -206,9 +206,12 @@ impl HassManager {
                                             &state,
                                             &publish.payload,
                                         );
-                                        let payload = String::from_utf8_lossy(&publish.payload).to_string();
+                                        let payload =
+                                            String::from_utf8_lossy(&publish.payload).to_string();
                                         state.chrome.set_playlist(payload).await;
-                                        if let Some(interrupt) = state.chrome.interrupt.lock().await.take() {
+                                        if let Some(interrupt) =
+                                            state.chrome.interrupt.lock().await.take()
+                                        {
                                             interrupt.send(()).unwrap();
                                         }
                                     }

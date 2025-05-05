@@ -14,9 +14,14 @@ pub struct Config {
 
 #[derive(Debug, Deserialize)]
 pub struct HomeAssistantConfig {
-    pub mqtt_url: String,
-    pub mqtt_username: Option<String>,
-    pub mqtt_password: Option<String>,
+    pub mqtt: HASSMQTTConfig,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HASSMQTTConfig {
+    pub url: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
