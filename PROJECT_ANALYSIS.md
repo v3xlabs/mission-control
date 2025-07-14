@@ -157,11 +157,20 @@ Mission Control is a Rust-based digital signage solution that controls displays 
 - **API Integration**: Auto-generated TypeScript clients from OpenAPI specs
 
 #### 3.2 Management Interface Features
+
+**Phase 3A: Monitoring Dashboard (Immediate)**
+- **Playlist Overview**: Grid/list view of all playlists with tab counts
+- **Tab Display**: Show tabs within each playlist with metadata
+- **Live Status**: Visual indicator of currently active playlist/tab
+- **Preview Thumbnails**: Live preview images for each tab
+- **Real-time Updates**: WebSocket or polling for status changes
+
+**Phase 3B: Configuration Management (Future)**
 - **Device Management**: Add/edit devices and displays
+- **Playlist Builder**: Drag-and-drop playlist creation and tab reordering
 - **Tab Management**: CRUD operations for tabs with URL validation
-- **Playlist Builder**: Drag-and-drop playlist creation
-- **Live Preview**: Real-time display monitoring
 - **Configuration**: Runtime configuration updates
+- **Authentication**: Config-based admin_key with login interface
 
 #### 3.3 Advanced Features
 - **Scheduling**: Time-based playlist switching

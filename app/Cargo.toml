@@ -31,3 +31,7 @@ async-stream = "0.3.6"
 bytes = { version = "1.10.0", features = ["serde"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["serde"] }
+poem-openapi = { version = "5.1.15", features = ["static-files", "swagger-ui"] }
+chrono = { version = "0.4.39", features = ["serde"] }
+uuid = { version = "1.7.0", features = ["v4", "serde"] }
+tokio = { version = "1.35", features = ["macros", "rt", "rt-multi-thread", "sync"] }

@@ -5,6 +5,7 @@ use async_std::task;
 use state::AppState;
 use tracing::info;
 
+pub mod api;
 pub mod chrome;
 pub mod config;
 pub mod http;

@@ -6,18 +6,27 @@ use base64::Engine;
 use poem::{
     get, handler,
     listener::TcpListener,
+    middleware::Cors,
     web::{Data, Path},
     Body, EndpointExt as _, IntoResponse, Response, Route, Server,
 };
+use poem_openapi::OpenApiService;
 
-use crate::state::AppState;
+use crate::{api, state::AppState};
 
 pub async fn start_http(state: Arc<AppState>) -> Result<()> {
+    info!("Starting HTTP server on port 3000");
+
+    // Create OpenAPI service and Swagger UI
+    let api_service: OpenApiService<api::ManagementApi, ()> = api::create_api_service(state.clone());
+    let ui = api_service.swagger_ui();
+    
     let app = Route::new()
-        .at("/", get(root))
-        .at("/preview/:tab_id", get(preview))
-        .at("/preview_live/:tab_id", get(preview_live))
-        .data(state);
+        .nest("/", api_service)
+        .at("/api/preview/:tab_id", get(preview))
+        .at("/api/preview_live/:tab_id", get(preview_live))
+        .nest("/docs", ui)
+        .with(Cors::new());
 
     let server = Server::new(TcpListener::bind("0.0.0.0:3000"));
     server.run(app).await?;
