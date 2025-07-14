@@ -2,6 +2,7 @@ import { FC } from "react";
 import classnames from "classnames";
 import { TabList } from "./TabList";
 import { useActivatePlaylist } from "../hooks/useActivatePlaylist";
+import { useCurrentPlaylist } from "../hooks/useCurrentPlaylist";
 
 interface PlaylistInfo {
   id: string;
@@ -17,23 +18,29 @@ interface Props {
 
 export const PlaylistCard: FC<Props> = ({ playlist }) => {
   const activate = useActivatePlaylist();
+  const { currentPlaylist } = useCurrentPlaylist();
+  
+  // Use only the current playlist from status API as the single source of truth
+  const isActive = currentPlaylist === playlist.id;
+  
   return (
     <div
       className={classnames(
         "border rounded-lg p-4 shadow-sm transition-colors",
-        playlist.is_active ? "border-green-500" : "border-gray-700"
+        isActive ? "border-green-500" : "border-gray-700"
       )}
     >
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xl font-semibold">{playlist.name}</h2>
-        {playlist.is_active ? (
+        {isActive ? (
           <span className="px-2 py-1 text-xs bg-green-600 rounded">Active</span>
         ) : (
           <button
             onClick={() => activate.mutate(playlist.id)}
             className="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-700"
+            disabled={activate.isPending}
           >
-            Activate
+            {activate.isPending ? "Activating..." : "Activate"}
           </button>
         )}
       </div>

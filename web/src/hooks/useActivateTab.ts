@@ -20,7 +20,22 @@ export const useActivateTab = () => {
   
   return useMutation({
     ...activateTab(),
+    onMutate: async ({ playlistId, tabId }: { playlistId: string; tabId: string }) => {
+      // Only optimistically update the current tab and playlist from status API
+      qc.setQueryData(['status'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          current_playlist: playlistId,
+          current_tab: tabId,
+        };
+      });
+    },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["status"] });
+    },
+    onError: () => {
+      // Revert optimistic updates on error
       qc.invalidateQueries({ queryKey: ["status"] });
     },
   });

@@ -11,7 +11,7 @@ pub struct PlaylistInfo {
     /// Number of tabs in the playlist
     pub tab_count: usize,
     /// Interval between tab switches in seconds
-    pub interval_seconds: u32,
+    pub interval_seconds: i64,
     /// Whether this playlist is currently active
     pub is_active: bool,
 }

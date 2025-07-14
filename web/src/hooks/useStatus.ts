@@ -14,5 +14,6 @@ const getStatus = () => {
 export const useStatus = () =>
   useQuery({
     ...getStatus(),
-    refetchInterval: 2000,
-  }); 
+    refetchInterval: 5000,
+    staleTime: 500,
+  });

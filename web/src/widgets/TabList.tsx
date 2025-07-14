@@ -1,6 +1,6 @@
 import { FC, useEffect, useState } from "react";
 import classnames from "classnames";
-import { useStatus } from "../hooks/useStatus";
+import { useCurrentPlaylist } from "../hooks/useCurrentPlaylist";
 import { useActivateTab } from "../hooks/useActivateTab";
 import { useTabs } from "../api/tabs";
 import type { components } from "../api/schema.gen";
@@ -12,9 +12,9 @@ interface Props {
 }
 
 export const TabList: FC<Props> = ({ playlistId }) => {
-  const { data: status } = useStatus();
+  const { currentPlaylist, currentTab } = useCurrentPlaylist();
   const currentTabId =
-    status && status.current_playlist === playlistId ? status.current_tab : null;
+    currentPlaylist === playlistId ? currentTab : null;
 
   const { data, error, isLoading } = useTabs(playlistId);
 
@@ -65,8 +65,9 @@ export const TabList: FC<Props> = ({ playlistId }) => {
             key={tab.id}
             onClick={() => activateTab.mutate({ playlistId, tabId: tab.id })}
             className={classnames(
-              "flex items-center space-x-3 p-2 rounded hover:bg-gray-800 cursor-pointer",
-              isActive ? "border border-green-500" : "border border-gray-700"
+              "flex items-center space-x-3 p-2 rounded hover:bg-gray-800 cursor-pointer transition-colors",
+              isActive ? "border border-green-500 bg-green-900/20" : "border border-gray-700",
+              activateTab.isPending ? "opacity-50 cursor-not-allowed" : ""
             )}
           >
             <div className="h-24 object-cover aspect-video rounded border overflow-hidden">

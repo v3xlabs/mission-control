@@ -19,9 +19,23 @@ export const useActivatePlaylist = () => {
   
   return useMutation({
     ...activatePlaylist(),
+    onMutate: async (playlistId: string) => {
+      // Only optimistically update the current playlist from status API
+      qc.setQueryData(['status'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          current_playlist: playlistId,
+          current_tab: undefined, // Reset current tab when playlist changes
+        };
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["status"] });
-      qc.invalidateQueries({ queryKey: ["playlists"] });
+    },
+    onError: () => {
+      // Revert optimistic updates on error
+      qc.invalidateQueries({ queryKey: ["status"] });
     },
   });
 }; 

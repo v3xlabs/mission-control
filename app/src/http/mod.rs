@@ -50,14 +50,33 @@ async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl Into
     info!("preview: {}", tab_id.0);
 
     let last_frames = state.chrome.last_frame.lock().await;
-    let body = last_frames.get(&tab_id.0).unwrap();
+    let available_tabs: Vec<String> = last_frames.keys().cloned().collect();
+    info!("Available tabs with frames: {:?}", available_tabs);
+    
+    let body = match last_frames.get(&tab_id.0) {
+        Some(body) => body,
+        None => {
+            info!("no body for tab_id: {}", tab_id.0);
+            return Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body("No body for tab_id".to_string())
+                .into_response();
+        }
+    };
 
     // base64 decode body
-    let body = base64::engine::general_purpose::STANDARD
-        .decode(body)
-        .unwrap();
+    let body = match base64::engine::general_purpose::STANDARD.decode(body) {
+        Ok(decoded) => decoded,
+        Err(e) => {
+            info!("Failed to decode base64 for tab_id {}: {}", tab_id.0, e);
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body("Failed to decode image".to_string())
+                .into_response();
+        }
+    };
 
-    info!("body: {:?}", body.len());
+    info!("Successfully decoded image for tab_id {}: {} bytes", tab_id.0, body.len());
 
     Response::builder()
         .body(Body::from_bytes(body.clone().into()))

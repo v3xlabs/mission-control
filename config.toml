@@ -20,18 +20,18 @@ binary_path = "/usr/bin/chromium"
 # optional (default dark)
 theme = "dark"
 
-[chromium.tabs.my_homepage]
-url = "https://v3x.fyi/s1"
-persist = true
+# [chromium.tabs.my_homepage]
+# url = "https://v3x.fyi/s1"
+# persist = true
 
-[chromium.tabs.google_news]
-url = "https://news.google.com/topstories"
-persist = true
+# [chromium.tabs.google_news]
+# url = "https://news.google.com/topstories"
+# persist = true
 
-[chromium.playlists.my_playlist]
-tabs = [
-    "my_homepage",
-    "google_news",
-]
-# Alternate between tabs every 30 seconds
-interval = 30
+# [chromium.playlists.my_playlist]
+# tabs = [
+#     "my_homepage",
+#     "google_news",
+# ]
+# # Alternate between tabs every 30 seconds
+# interval = 30

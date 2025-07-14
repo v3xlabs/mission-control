@@ -8,6 +8,7 @@ use tracing::info;
 pub mod api;
 pub mod chrome;
 pub mod config;
+pub mod db;
 pub mod http;
 pub mod models;
 pub mod state;
@@ -21,19 +22,26 @@ async fn main() -> Result<()> {
 
     info!("Config: {:?}", config);
 
-    let (state, mut connection) = AppState::new(config).await;
+    // Initialize database
+    let db_pool = db::init_database().await?;
+    
+    // Import config data if chromium config exists
+    if let Some(ref chromium_config) = config.chromium {
+        db::import_config_data(&db_pool, chromium_config).await?;
+    }
+
+    let (state, mut connection) = AppState::new(config, db_pool).await;
     let state = Arc::new(state);
-    let chromium = state.chrome.clone();
 
     if let Some(chromium_config) = &state.config.chromium {
         if chromium_config.enabled {
             let chromium_config_clone = chromium_config.clone();
             let state_clone = state.clone();
 
-            let chromium_2 = chromium.clone();
-
             task::spawn(async move {
-                chromium_2.start(&chromium_config_clone, &state_clone).await.unwrap();
+                if let Err(e) = state_clone.chrome.start(&chromium_config_clone, &state_clone).await {
+                    tracing::error!("Failed to start Chrome controller: {}", e);
+                }
             });
         }
     }

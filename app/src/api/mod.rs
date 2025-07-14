@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
 use poem_openapi::{payload::Json, OpenApi, OpenApiService};
-use crate::state::AppState;
-use futures::SinkExt;
+use crate::{
+    state::AppState,
+    db::repositories::{PlaylistRepository, TabRepository, PlaylistTabRepository}
+};
+
 
 pub mod models;
 use models::*;
@@ -58,16 +61,16 @@ impl ManagementApi {
     #[oai(path = "/playlists/:playlist_id/activate", method = "post")]
     async fn activate_playlist(&self, playlist_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
         let pid = playlist_id.0.clone();
-        self.state.chrome.set_playlist(pid.clone()).await;
-        // interrupt playlist loop
-        let _ = self
-            .state
-            .chrome
-            .interrupt_sender
-            .lock()
-            .await
-            .send(())
-            .await;
+        tracing::info!("API: Activating playlist {}", pid);
+        
+        // Send message to Chrome controller
+        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
+            crate::chrome::ChromeMessage::ActivatePlaylist { playlist_id: pid.clone() }).await {
+            tracing::error!("API: Error activating playlist {}: {}", pid, e);
+            return poem_openapi::payload::PlainText(format!("Error activating playlist: {}", e));
+        }
+        
+        tracing::info!("API: Successfully sent activate playlist message for {}", pid);
         poem_openapi::payload::PlainText("ok".into())
     }
 
@@ -76,51 +79,186 @@ impl ManagementApi {
     async fn activate_tab(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
         let pid = playlist_id.0.clone();
         let tid = tab_id.0.clone();
+        tracing::info!("API: Activating tab {} in playlist {}", tid, pid);
 
-        // switch playlist first if needed
-        self.state.chrome.set_playlist(pid.clone()).await;
-        let _ = self
-            .state
-            .chrome
-            .interrupt_sender
-            .lock()
-            .await
-            .send(())
-            .await;
+        // Send message to Chrome controller to activate tab
+        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
+            crate::chrome::ChromeMessage::ActivateTab { tab_id: tid.clone(), playlist_id: pid.clone() }).await {
+            tracing::error!("API: Error activating tab {}: {}", tid, e);
+            return poem_openapi::payload::PlainText(format!("Error activating tab: {}", e));
+        }
 
-        // now activate tab
-        let _ = self
-            .state
-            .chrome
-            .activate_tab(&tid, &self.state)
-            .await;
-
+        tracing::info!("API: Successfully sent activate tab message for {}", tid);
         poem_openapi::payload::PlainText("ok".into())
+    }
+
+    /// Create a new playlist
+    #[oai(path = "/playlists", method = "post")]
+    async fn create_playlist(&self, request: Json<crate::db::models::CreatePlaylistRequest>) -> Json<PlaylistInfo> {
+        match self.state.playlist_repository.create(request.0).await {
+            Ok(playlist) => Json(PlaylistInfo {
+                id: playlist.id,
+                name: playlist.name,
+                tab_count: 0,
+                interval_seconds: playlist.interval_seconds,
+                is_active: playlist.is_active,
+            }),
+            Err(e) => {
+                // Return error playlist info - in real implementation should return proper error
+                Json(PlaylistInfo {
+                    id: "error".to_string(),
+                    name: format!("Error: {}", e),
+                    tab_count: 0,
+                    interval_seconds: 30,
+                    is_active: false,
+                })
+            }
+        }
+    }
+
+    /// Update an existing playlist
+    #[oai(path = "/playlists/:playlist_id", method = "put")]
+    async fn update_playlist(&self, playlist_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::UpdatePlaylistRequest>) -> Json<PlaylistInfo> {
+        match self.state.playlist_repository.update(&playlist_id.0, request.0).await {
+            Ok(Some(playlist)) => {
+                // Get tab count
+                let tabs = self.state.playlist_tab_repository.get_playlist_tabs(&playlist.id).await.unwrap_or_default();
+                Json(PlaylistInfo {
+                    id: playlist.id,
+                    name: playlist.name,
+                    tab_count: tabs.len(),
+                    interval_seconds: playlist.interval_seconds,
+                    is_active: playlist.is_active,
+                })
+            },
+            Ok(None) => Json(PlaylistInfo {
+                id: "not_found".to_string(),
+                name: "Playlist not found".to_string(),
+                tab_count: 0,
+                interval_seconds: 30,
+                is_active: false,
+            }),
+            Err(e) => Json(PlaylistInfo {
+                id: "error".to_string(),
+                name: format!("Error: {}", e),
+                tab_count: 0,
+                interval_seconds: 30,
+                is_active: false,
+            })
+        }
+    }
+
+    /// Delete a playlist
+    #[oai(path = "/playlists/:playlist_id", method = "delete")]
+    async fn delete_playlist(&self, playlist_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        match self.state.playlist_repository.delete(&playlist_id.0).await {
+            Ok(true) => poem_openapi::payload::PlainText("Playlist deleted successfully".to_string()),
+            Ok(false) => poem_openapi::payload::PlainText("Playlist not found".to_string()),
+            Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
+        }
+    }
+
+    /// Create a new tab
+    #[oai(path = "/tabs", method = "post")]
+    async fn create_tab(&self, request: Json<crate::db::models::CreateTabRequest>) -> Json<TabInfo> {
+        match self.state.tab_repository.create(request.0).await {
+            Ok(tab) => Json(TabInfo {
+                id: tab.id,
+                name: tab.name,
+                url: tab.url,
+                order_index: 0,
+                persist: tab.persist,
+            }),
+            Err(e) => Json(TabInfo {
+                id: "error".to_string(),
+                name: format!("Error: {}", e),
+                url: "".to_string(),
+                order_index: 0,
+                persist: false,
+            })
+        }
+    }
+
+    /// Update an existing tab
+    #[oai(path = "/tabs/:tab_id", method = "put")]
+    async fn update_tab(&self, tab_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::UpdateTabRequest>) -> Json<TabInfo> {
+        match self.state.tab_repository.update(&tab_id.0, request.0).await {
+            Ok(Some(tab)) => Json(TabInfo {
+                id: tab.id,
+                name: tab.name,
+                url: tab.url,
+                order_index: 0,
+                persist: tab.persist,
+            }),
+            Ok(None) => Json(TabInfo {
+                id: "not_found".to_string(),
+                name: "Tab not found".to_string(),
+                url: "".to_string(),
+                order_index: 0,
+                persist: false,
+            }),
+            Err(e) => Json(TabInfo {
+                id: "error".to_string(),
+                name: format!("Error: {}", e),
+                url: "".to_string(),
+                order_index: 0,
+                persist: false,
+            })
+        }
+    }
+
+    /// Delete a tab
+    #[oai(path = "/tabs/:tab_id", method = "delete")]
+    async fn delete_tab(&self, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        match self.state.tab_repository.delete(&tab_id.0).await {
+            Ok(true) => poem_openapi::payload::PlainText("Tab deleted successfully".to_string()),
+            Ok(false) => poem_openapi::payload::PlainText("Tab not found".to_string()),
+            Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
+        }
+    }
+
+    /// Add a tab to a playlist
+    #[oai(path = "/playlists/:playlist_id/tabs", method = "post")]
+    async fn add_tab_to_playlist(&self, playlist_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::AddTabToPlaylistRequest>) -> poem_openapi::payload::PlainText<String> {
+        match self.state.playlist_tab_repository.add_tab_to_playlist(&playlist_id.0, request.0).await {
+            Ok(()) => poem_openapi::payload::PlainText("Tab added to playlist successfully".to_string()),
+            Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
+        }
+    }
+
+    /// Remove a tab from a playlist
+    #[oai(path = "/playlists/:playlist_id/tabs/:tab_id", method = "delete")]
+    async fn remove_tab_from_playlist(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        match self.state.playlist_tab_repository.remove_tab_from_playlist(&playlist_id.0, &tab_id.0).await {
+            Ok(true) => poem_openapi::payload::PlainText("Tab removed from playlist successfully".to_string()),
+            Ok(false) => poem_openapi::payload::PlainText("Tab not found in playlist".to_string()),
+            Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
+        }
+    }
+
+    /// Reorder tabs in a playlist
+    #[oai(path = "/playlists/:playlist_id/reorder", method = "put")]
+    async fn reorder_tabs(&self, playlist_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::ReorderTabsRequest>) -> poem_openapi::payload::PlainText<String> {
+        match self.state.playlist_tab_repository.reorder_tabs(&playlist_id.0, request.0).await {
+            Ok(()) => poem_openapi::payload::PlainText("Tabs reordered successfully".to_string()),
+            Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
+        }
     }
 }
 
 impl ManagementApi {
     async fn get_playlists_impl(&self) -> anyhow::Result<Vec<PlaylistInfo>> {
+        let playlists_with_tabs = self.state.playlist_repository.get_all_with_tabs().await?;
+        
         let mut playlists = Vec::new();
-
-        if let Some(chromium_config) = &self.state.config.chromium {
-            if let Some(playlist_configs) = &chromium_config.playlists {
-                for (name, config) in playlist_configs {
-                    let tab_count = config.tabs.len();
-                    let is_active = {
-                        let current_playlist = self.state.chrome.current_playlist.lock().await;
-                        current_playlist.as_ref() == Some(name)
-                    };
-
-                    playlists.push(PlaylistInfo {
-                        id: name.clone(),
-                        name: name.clone(),
-                        tab_count,
-                        interval_seconds: config.interval,
-                        is_active,
-                    });
-                }
-            }
+        for playlist in playlists_with_tabs {
+            playlists.push(PlaylistInfo {
+                id: playlist.id,
+                name: playlist.name,
+                tab_count: playlist.tabs.len(),
+                interval_seconds: playlist.interval_seconds,
+                is_active: playlist.is_active,
+            });
         }
 
         Ok(playlists)
@@ -130,54 +268,30 @@ impl ManagementApi {
         &self,
         playlist_id: &str,
     ) -> anyhow::Result<Option<Vec<TabInfo>>> {
-        if let Some(chromium_config) = &self.state.config.chromium {
-            if let Some(playlist_configs) = &chromium_config.playlists {
-                if let Some(playlist_config) = playlist_configs.get(playlist_id) {
-                    let mut tabs = Vec::new();
-
-                    for (index, tab_id) in playlist_config.tabs.iter().enumerate() {
-                        if let Some(tab_configs) = &chromium_config.tabs {
-                            if let Some(tab_config) = tab_configs.get(tab_id) {
-                                tabs.push(TabInfo {
-                                    id: tab_id.clone(),
-                                    name: tab_id.clone(),
-                                    url: tab_config.url.clone(),
-                                    order_index: index,
-                                    persist: tab_config.persist,
-                                });
-                            }
-                        }
-                    }
-
-                    return Ok(Some(tabs));
-                }
-            }
+        let tabs_with_order = self.state.playlist_tab_repository.get_playlist_tabs(playlist_id).await?;
+        
+        let mut tabs = Vec::new();
+        for tab in tabs_with_order {
+            tabs.push(TabInfo {
+                id: tab.id,
+                name: tab.name,
+                url: tab.url,
+                order_index: tab.order_index as usize,
+                persist: tab.persist,
+            });
         }
 
-        Ok(None)
+        Ok(Some(tabs))
     }
 
     async fn get_status_impl(&self) -> anyhow::Result<DeviceStatus> {
-        let current_playlist = self.state.chrome.current_playlist.lock().await.clone();
+        let chrome_state = self.state.chrome.state.lock().await;
+        let current_playlist = chrome_state.current_playlist_id.clone();
+        let current_tab = chrome_state.current_tab_id.clone();
 
-        // NOTE: Currently we don't track the precise active tab index. We'll return the first tab.
-        let current_tab = if let Some(ref playlist_id) = current_playlist {
-            if let Some(chromium_config) = &self.state.config.chromium {
-                if let Some(playlist_configs) = &chromium_config.playlists {
-                    if let Some(playlist_config) = playlist_configs.get(playlist_id) {
-                        playlist_config.tabs.first().cloned()
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        // Log state for debugging
+        tracing::info!("Chrome state - playlist: {:?}, tab: {:?}, running: {}", 
+            current_playlist, current_tab, chrome_state.is_running);
 
         Ok(DeviceStatus {
             device_id: self.state.config.device.id.clone(),

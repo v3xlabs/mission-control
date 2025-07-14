@@ -32,7 +32,30 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /** Create a new playlist */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["CreatePlaylistRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["PlaylistInfo"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -69,7 +92,32 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /** Add a tab to a playlist */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    playlist_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["AddTabToPlaylistRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -186,10 +234,274 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/playlists/{playlist_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update an existing playlist */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    playlist_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["UpdatePlaylistRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["PlaylistInfo"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Delete a playlist */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    playlist_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tabs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a new tab */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["CreateTabRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["TabInfo"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tabs/{tab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update an existing tab */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["UpdateTabRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["TabInfo"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Delete a tab */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playlists/{playlist_id}/tabs/{tab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a tab from a playlist */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    playlist_id: string;
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playlists/{playlist_id}/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder tabs in a playlist */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    playlist_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["ReorderTabsRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddTabToPlaylistRequest */
+        AddTabToPlaylistRequest: {
+            tab_id: string;
+            /** Format: int64 */
+            order_index: number;
+            /** Format: int64 */
+            duration_seconds?: number;
+        };
+        /** CreatePlaylistRequest */
+        CreatePlaylistRequest: {
+            id: string;
+            name: string;
+            /** Format: int64 */
+            interval_seconds: number;
+        };
+        /** CreateTabRequest */
+        CreateTabRequest: {
+            id: string;
+            name: string;
+            url: string;
+            persist?: boolean;
+        };
         /**
          * DeviceStatus
          * @description Current device status
@@ -224,12 +536,16 @@ export interface components {
              */
             tab_count: number;
             /**
-             * Format: uint32
+             * Format: int64
              * @description Interval between tab switches in seconds
              */
             interval_seconds: number;
             /** @description Whether this playlist is currently active */
             is_active: boolean;
+        };
+        /** ReorderTabsRequest */
+        ReorderTabsRequest: {
+            tab_orders: components["schemas"]["TabOrder"][];
         };
         /**
          * TabInfo
@@ -249,6 +565,25 @@ export interface components {
             order_index: number;
             /** @description Whether this tab persists in browser memory */
             persist: boolean;
+        };
+        /** TabOrder */
+        TabOrder: {
+            tab_id: string;
+            /** Format: int64 */
+            order_index: number;
+        };
+        /** UpdatePlaylistRequest */
+        UpdatePlaylistRequest: {
+            name?: string;
+            /** Format: int64 */
+            interval_seconds?: number;
+            is_active?: boolean;
+        };
+        /** UpdateTabRequest */
+        UpdateTabRequest: {
+            name?: string;
+            url?: string;
+            persist?: boolean;
         };
     };
     responses: never;

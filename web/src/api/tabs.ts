@@ -18,5 +18,4 @@ const getTabs = (playlistId: string) => {
 export const useTabs = (playlistId: string) =>
   useQuery({
     ...getTabs(playlistId),
-    refetchInterval: 5000,
   }); 

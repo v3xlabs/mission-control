@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use crate::{config::Config, state::AppState};
 use entity::HassEntity;
-use futures::SinkExt;
+
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
 use tracing::info;
@@ -207,8 +207,8 @@ impl HassManager {
                                 );
                                 let payload =
                                     String::from_utf8_lossy(&publish.payload).to_string();
-                                state.chrome.set_playlist(payload).await;
-                                state.chrome.interrupt_sender.lock().await.send(()).await.unwrap();
+                                let _ = crate::chrome::send_chrome_message(&state.chrome, 
+                                    crate::chrome::ChromeMessage::ActivatePlaylist { playlist_id: payload }).await;
                             }
                         }
                     }
