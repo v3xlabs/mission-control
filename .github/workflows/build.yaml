@@ -56,8 +56,8 @@ jobs:
               working-directory: web
               run: pnpm build
 
-            # Create web directory in app/src and copy built assets
-            - name: Copy web build to app/src/web
+            # Copy web build to app/src/web for embedding
+            - name: Copy web build to app/src/web for embedding
               run: |
                   mkdir -p app/src/web
                   cp -r web/dist/* app/src/web/

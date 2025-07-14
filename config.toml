@@ -1,4 +1,4 @@
-#:schema ./schema2.json
+#:schema ./config_schema.json
 
 [homeassistant.mqtt]
 url = "mqtt://localhost:1883"
