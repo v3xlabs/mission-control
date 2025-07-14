@@ -204,7 +204,7 @@ impl HassEntity {
             name: "Tab".to_string(),
             icon: "mdi:tab".to_string(),
             unique_id: format!("{unique_id}_tab", unique_id = unique_id),
-            device_class: "text".to_string(),
+            device_class: "select".to_string(),
             device: HassDevice {
                 identifiers: vec![unique_id.clone()],
                 name,
@@ -212,15 +212,15 @@ impl HassEntity {
                 serial_number: unique_id.clone(),
             },
             state_topic: format!(
-                "homeassistant/text/{unique_id}_tab/state",
+                "homeassistant/select/{unique_id}_tab/state",
                 unique_id = unique_id
             ),
             command_topic: format!(
-                "homeassistant/text/{unique_id}_tab/set",
+                "homeassistant/select/{unique_id}_tab/set",
                 unique_id = unique_id
             ),
             config_topic: format!(
-                "homeassistant/text/{unique_id}_tab/config",
+                "homeassistant/select/{unique_id}_tab/config",
                 unique_id = unique_id
             ),
             availability_topic,
@@ -233,7 +233,7 @@ impl HassEntity {
             min: None,
             max: None,
             step: None,
-            options: None,
+            options: Some(vec![]),
             on_change: None,
             extra: None,
         }
@@ -318,5 +318,10 @@ impl HassEntity {
         client
             .publish(&self.state_topic, QoS::AtLeastOnce, true, state.to_string())
             .unwrap();
+    }
+
+    pub fn update_options(&mut self, client: &Client, options: Vec<String>) {
+        self.options = Some(options);
+        self.publish_config(client);
     }
 }
