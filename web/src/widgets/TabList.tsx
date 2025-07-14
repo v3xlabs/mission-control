@@ -2,6 +2,7 @@ import { FC } from "react";
 import { useQuery } from "@tanstack/react-query";
 import classnames from "classnames";
 import { useStatus } from "../hooks/useStatus";
+import { useActivateTab } from "../hooks/useActivateTab";
 
 interface TabInfo {
   id: string;
@@ -33,6 +34,8 @@ export const TabList: FC<Props> = ({ playlistId }) => {
     refetchInterval: 5000,
   });
 
+  const activateTab = useActivateTab(playlistId);
+
   if (isLoading) return <div>Loading tabs...</div>;
   if (error || !data) return <div>Error loading tabs</div>;
 
@@ -46,8 +49,9 @@ export const TabList: FC<Props> = ({ playlistId }) => {
         return (
           <li
             key={tab.id}
+            onClick={() => activateTab.mutate(tab.id)}
             className={classnames(
-              "flex items-center space-x-3 p-2 rounded hover:bg-gray-800",
+              "flex items-center space-x-3 p-2 rounded hover:bg-gray-800 cursor-pointer",
               isActive ? "border border-green-500" : "border border-gray-700"
             )}
           >

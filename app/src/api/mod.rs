@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use poem_openapi::{payload::Json, OpenApi, OpenApiService};
 use crate::state::AppState;
+use futures::SinkExt;
 
 pub mod models;
 use models::*;
@@ -51,6 +52,36 @@ impl ManagementApi {
                 uptime_seconds: 0,
             });
         Json(status)
+    }
+
+    /// Activate a playlist
+    #[oai(path = "/playlists/:playlist_id/activate", method = "post")]
+    async fn activate_playlist(&self, playlist_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        let pid = playlist_id.0.clone();
+        self.state.chrome.set_playlist(pid.clone()).await;
+        // interrupt playlist loop
+        let _ = self
+            .state
+            .chrome
+            .interrupt_sender
+            .lock()
+            .await
+            .send(())
+            .await;
+        poem_openapi::payload::PlainText("ok".into())
+    }
+
+    /// Activate a tab immediately
+    #[oai(path = "/playlists/:playlist_id/tabs/:tab_id/activate", method = "post")]
+    async fn activate_tab(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        let tid = tab_id.0.clone();
+        // ignore playlist_id for now
+        let _ = self
+            .state
+            .chrome
+            .activate_tab(&tid, &self.state)
+            .await;
+        poem_openapi::payload::PlainText("ok".into())
     }
 }
 

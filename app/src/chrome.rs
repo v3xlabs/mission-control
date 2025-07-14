@@ -32,6 +32,7 @@ pub struct ChromeController {
     pub interrupt_sender: Arc<Mutex<Sender<()>>>,
     pub interrupt_receiver: Arc<Mutex<Receiver<()>>>,
     pub pages: Arc<Mutex<HashMap<String, Page>>>,
+    pub browser: Arc<Mutex<Option<Arc<Browser>>>>,
 }
 
 impl Default for ChromeController {
@@ -45,6 +46,7 @@ impl Default for ChromeController {
             interrupt_sender: Arc::new(Mutex::new(interrupt_sender)),
             interrupt_receiver: Arc::new(Mutex::new(interrupt_receiver)),
             pages: Arc::new(Mutex::new(HashMap::new())),
+            browser: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -88,7 +90,14 @@ impl ChromeController {
 
         info!("{:?}", browser_config);
 
-        let (browser, mut handler) = Browser::launch(browser_config).await?;
+        let (browser_raw, mut handler) = Browser::launch(browser_config).await?;
+        let browser = std::sync::Arc::new(browser_raw);
+
+        // store browser for later external actions
+        {
+            let mut br_lock = self.browser.lock().await;
+            *br_lock = Some(browser.clone());
+        }
 
         task::spawn(async move {
             while let Some(event) = handler.next().await {
@@ -174,7 +183,7 @@ impl ChromeController {
         Ok(())
     }
 
-    pub async fn run(&self, config: &ChromiumConfig, state: &Arc<AppState>, browser: &Browser) {
+    pub async fn run(&self, config: &ChromiumConfig, state: &Arc<AppState>, browser: &Arc<Browser>) {
         let mut current_tab = 0;
         loop {
             let mut sleep_duration = Duration::from_secs(10000);
@@ -287,5 +296,46 @@ impl ChromeController {
 
     pub async fn set_playlist(&self, playlist: String) {
         self.current_playlist.lock().await.replace(playlist);
+    }
+
+    /// Activate a specific tab immediately, opening it if necessary.
+    pub async fn activate_tab(&self, tab_id: &str, state: &Arc<AppState>) -> Result<()> {
+        let config = match &state.config.chromium {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+
+        let mut pages = self.pages.lock().await;
+        if let Some(page) = pages.get(tab_id) {
+            page.activate().await?;
+        } else {
+            // need to open
+            let browser_opt = self.browser.lock().await;
+            if let Some(browser) = browser_opt.as_ref() {
+                if let Some(tab_config) = config.tabs.as_ref().and_then(|t| t.get(tab_id)) {
+                    let page = browser.new_page("about:blank").await?;
+                    page.execute(
+                        NavigateParams::builder()
+                            .url(tab_config.url.clone())
+                            .build()
+                            .unwrap(),
+                    )
+                    .await?;
+                    pages.insert(tab_id.to_string(), page.clone());
+                    page.activate().await?;
+                }
+            }
+        }
+
+        // update hass entities
+        state.hass.tab_entity.update_state(&state.hass.mqtt_client, tab_id);
+        if let Some(tab_config) = config.tabs.as_ref().and_then(|t| t.get(tab_id)) {
+            state
+                .hass
+                .url_entity
+                .update_state(&state.hass.mqtt_client, &tab_config.url);
+        }
+
+        Ok(())
     }
 }
