@@ -74,13 +74,27 @@ impl ManagementApi {
     /// Activate a tab immediately
     #[oai(path = "/playlists/:playlist_id/tabs/:tab_id/activate", method = "post")]
     async fn activate_tab(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        let pid = playlist_id.0.clone();
         let tid = tab_id.0.clone();
-        // ignore playlist_id for now
+
+        // switch playlist first if needed
+        self.state.chrome.set_playlist(pid.clone()).await;
+        let _ = self
+            .state
+            .chrome
+            .interrupt_sender
+            .lock()
+            .await
+            .send(())
+            .await;
+
+        // now activate tab
         let _ = self
             .state
             .chrome
             .activate_tab(&tid, &self.state)
             .await;
+
         poem_openapi::payload::PlainText("ok".into())
     }
 }

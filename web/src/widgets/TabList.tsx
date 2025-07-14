@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import classnames from "classnames";
 import { useStatus } from "../hooks/useStatus";
@@ -36,6 +36,36 @@ export const TabList: FC<Props> = ({ playlistId }) => {
 
   const activateTab = useActivateTab(playlistId);
 
+  // track consecutive preview errors per tab
+  const [errorMap, setErrorMap] = useState<Record<string, number>>({});
+
+  const [tick, setTick] = useState(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 30000); // 30 seconds
+    return () => clearInterval(id);
+  }, []);
+
+  const handleImgError = (tabId: string) => {
+    setErrorMap((prev) => {
+      const cnt = (prev[tabId] ?? 0) + 1;
+      return { ...prev, [tabId]: cnt };
+    });
+
+    const cnt = (errorMap[tabId] ?? 0) + 1;
+
+    if (cnt < 3) {
+      // quick retry
+      setTick(Date.now());
+    } else {
+      // back-off for 40 s before next retry and reset error counter
+      setTimeout(() => {
+        setErrorMap((prev) => ({ ...prev, [tabId]: 0 }));
+        setTick(Date.now());
+      }, 40000);
+    }
+  };
+
   if (isLoading) return <div>Loading tabs...</div>;
   if (error || !data) return <div>Error loading tabs</div>;
 
@@ -45,7 +75,7 @@ export const TabList: FC<Props> = ({ playlistId }) => {
         const isActive = tab.id === currentTabId;
         const imgSrc = isActive
           ? `/api/preview_live/${tab.id}`
-          : `/api/preview/${tab.id}`;
+          : `/api/preview/${tab.id}?t=${tick}`;
         return (
           <li
             key={tab.id}
@@ -59,6 +89,7 @@ export const TabList: FC<Props> = ({ playlistId }) => {
               <img
                 src={imgSrc}
                 alt={tab.name}
+                onError={() => handleImgError(tab.id)}
                 className="h-full w-full object-cover aspect-video"
               />
             </div>
