@@ -1,22 +1,11 @@
 import { FC, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import classnames from "classnames";
 import { useStatus } from "../hooks/useStatus";
 import { useActivateTab } from "../hooks/useActivateTab";
+import { useTabs } from "../api/tabs";
+import type { components } from "../api/schema.gen";
 
-interface TabInfo {
-  id: string;
-  name: string;
-  url: string;
-  order_index: number;
-  persist: boolean;
-}
-
-const fetchTabs = async (playlistId: string): Promise<TabInfo[]> => {
-  const res = await fetch(`/api/playlists/${playlistId}/tabs`);
-  if (!res.ok) throw new Error("Failed to fetch tabs");
-  return res.json();
-};
+type TabInfo = components["schemas"]["TabInfo"];
 
 interface Props {
   playlistId: string;
@@ -27,14 +16,9 @@ export const TabList: FC<Props> = ({ playlistId }) => {
   const currentTabId =
     status && status.current_playlist === playlistId ? status.current_tab : null;
 
-  // existing query fetch
-  const { data, error, isLoading } = useQuery({
-    queryKey: ["tabs", playlistId],
-    queryFn: () => fetchTabs(playlistId),
-    refetchInterval: 5000,
-  });
+  const { data, error, isLoading } = useTabs(playlistId);
 
-  const activateTab = useActivateTab(playlistId);
+  const activateTab = useActivateTab();
 
   // track consecutive preview errors per tab
   const [errorMap, setErrorMap] = useState<Record<string, number>>({});
@@ -71,7 +55,7 @@ export const TabList: FC<Props> = ({ playlistId }) => {
 
   return (
     <ul className="space-y-2">
-      {data.map((tab) => {
+      {data.map((tab: TabInfo) => {
         const isActive = tab.id === currentTabId;
         const imgSrc = isActive
           ? `/api/preview_live/${tab.id}`
@@ -79,7 +63,7 @@ export const TabList: FC<Props> = ({ playlistId }) => {
         return (
           <li
             key={tab.id}
-            onClick={() => activateTab.mutate(tab.id)}
+            onClick={() => activateTab.mutate({ playlistId, tabId: tab.id })}
             className={classnames(
               "flex items-center space-x-3 p-2 rounded hover:bg-gray-800 cursor-pointer",
               isActive ? "border border-green-500" : "border border-gray-700"

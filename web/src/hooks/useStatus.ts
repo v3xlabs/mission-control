@@ -1,23 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
+import { useApi } from "../api/api";
 
-interface DeviceStatus {
-  device_id: string;
-  device_name: string;
-  current_playlist?: string | null;
-  current_tab?: string | null;
-  uptime_seconds: number;
-}
-
-const fetchStatus = async (): Promise<DeviceStatus> => {
-  const res = await fetch("/api/status");
-  if (!res.ok) throw new Error("Failed to fetch status");
-  return res.json();
+const getStatus = () => {
+  return {
+    queryKey: ['status'],
+    queryFn: async () => {
+      const response = await useApi('/status', 'get', {});
+      return response.data;
+    },
+  };
 };
 
-export const useStatus = () => {
-  return useQuery({
-    queryKey: ["status"],
-    queryFn: fetchStatus,
+export const useStatus = () =>
+  useQuery({
+    ...getStatus(),
     refetchInterval: 2000,
-  });
-}; 
+  }); 
