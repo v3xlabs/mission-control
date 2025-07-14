@@ -33,6 +33,35 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
+            # Set up Node.js for web frontend build
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: 'npm'
+                  cache-dependency-path: web/pnpm-lock.yaml
+
+            # Install pnpm
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            # Build web frontend
+            - name: Install web dependencies
+              working-directory: web
+              run: pnpm install --frozen-lockfile
+
+            - name: Build web frontend
+              working-directory: web
+              run: pnpm build
+
+            # Create web directory in app/src and copy built assets
+            - name: Copy web build to app/src/web
+              run: |
+                  mkdir -p app/src/web
+                  cp -r web/dist/* app/src/web/
+
             # Set up Rust with the specific target we need
             - name: Install Rust
               run: rustup toolchain install stable --profile minimal --no-self-update

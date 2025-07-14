@@ -12,7 +12,7 @@ async-std = { version = "1.13.0", features = [
 ] }
 dotenvy = "0.15.7"
 futures = "0.3.31"
-poem = { version = "3.1.5", features = ["rustls"] }
+poem = { version = "3.1.5", features = ["rustls", "embed"] }
 reqwest = { version = "0.12.9", features = [
     "rustls-tls",
     # Add back the default features excluding native-tls
@@ -35,3 +35,5 @@ poem-openapi = { version = "5.1.15", features = ["static-files", "swagger-ui"] }
 chrono = { version = "0.4.39", features = ["serde"] }
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
 tokio = { version = "1.35", features = ["macros", "rt", "rt-multi-thread", "sync"] }
+rust-embed = "8.0.0"
+mime_guess = "2.0.4"

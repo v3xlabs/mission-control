@@ -3,8 +3,11 @@ use std::{sync::Arc, time::Duration};
 use tracing::info;
 use anyhow::Result;
 use base64::Engine;
+use rust_embed::RustEmbed;
 use poem::{
+    endpoint::EmbeddedFilesEndpoint,
     get, handler,
+    http::StatusCode,
     listener::TcpListener,
     middleware::Cors,
     web::{Data, Path},
@@ -13,6 +16,10 @@ use poem::{
 use poem_openapi::OpenApiService;
 
 use crate::{api, state::AppState};
+
+#[derive(RustEmbed)]
+#[folder = "src/web"]
+struct WebAssets;
 
 pub async fn start_http(state: Arc<AppState>) -> Result<()> {
     info!("Starting HTTP server on port 3000");
@@ -28,6 +35,7 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
         .nest("/api", api_service)
         .nest("/docs", ui)
         .at("/docs/spec", spec)
+        .nest("/", EmbeddedFilesEndpoint::<WebAssets>::new())
         .with(Cors::new());
 
     let server = Server::new(TcpListener::bind("0.0.0.0:3000"));
@@ -36,10 +44,6 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
     Ok(())
 }
 
-#[handler]
-async fn root() -> &'static str {
-    "v3x-mission-control"
-}
 
 #[handler]
 async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl IntoResponse {

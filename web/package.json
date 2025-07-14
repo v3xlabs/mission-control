@@ -5,7 +5,7 @@
   "scripts": {
     "api-schema": "openapi-typescript http://localhost:3000/docs/spec --output ./src/api/schema.gen.ts",
     "dev": "pnpm api-schema && vite",
-    "build": "pnpm api-schema && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
