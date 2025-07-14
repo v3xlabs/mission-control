@@ -20,11 +20,11 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
     // Create OpenAPI service and Swagger UI
     let api_service: OpenApiService<api::ManagementApi, ()> = api::create_api_service(state.clone());
     let ui = api_service.swagger_ui();
-    
+
     let app = Route::new()
-        .nest("/", api_service)
-        .at("/api/preview/:tab_id", get(preview))
-        .at("/api/preview_live/:tab_id", get(preview_live))
+        .at("/api/preview/:tab_id", get(preview).data(state.clone()))
+        .at("/api/preview_live/:tab_id", get(preview_live).data(state.clone()))
+        .nest("/api", api_service)
         .nest("/docs", ui)
         .with(Cors::new());
 

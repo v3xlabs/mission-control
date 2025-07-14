@@ -20,14 +20,14 @@ impl ManagementApi {
 #[OpenApi]
 impl ManagementApi {
     /// Get all playlists configured on the device.
-    #[oai(path = "/api/playlists", method = "get")]
+    #[oai(path = "/playlists", method = "get")]
     async fn get_playlists(&self) -> Json<Vec<PlaylistInfo>> {
         let playlists = self.get_playlists_impl().await.unwrap_or_default();
         Json(playlists)
     }
 
     /// Get all tabs from a given playlist.
-    #[oai(path = "/api/playlists/:playlist_id/tabs", method = "get")]
+    #[oai(path = "/playlists/:playlist_id/tabs", method = "get")]
     async fn get_playlist_tabs(&self, playlist_id: poem_openapi::param::Path<String>) -> Json<Vec<TabInfo>> {
         let tabs = self
             .get_playlist_tabs_impl(&playlist_id.0)
@@ -38,7 +38,7 @@ impl ManagementApi {
     }
 
     /// Retrieve basic device status information.
-    #[oai(path = "/api/status", method = "get")]
+    #[oai(path = "/status", method = "get")]
     async fn get_status(&self) -> Json<DeviceStatus> {
         let status = self
             .get_status_impl()
