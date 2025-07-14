@@ -51,11 +51,13 @@ export const TabList: FC<Props> = ({ playlistId }) => {
               isActive ? "border border-green-500" : "border border-gray-700"
             )}
           >
-            <img
-              src={imgSrc}
-              alt={tab.name}
-              className="w-16 h-12 object-cover rounded"
-            />
+            <div className="h-24 object-cover aspect-video rounded border overflow-hidden">
+              <img
+                src={imgSrc}
+                alt={tab.name}
+                className="h-full w-full object-cover aspect-video"
+              />
+            </div>
             <div className="flex-1">
               <div className="text-sm">{tab.name}</div>
               <a
