@@ -565,6 +565,16 @@ export interface components {
             order_index: number;
             /** @description Whether this tab persists in browser memory */
             persist: boolean;
+            /**
+             * Format: int32
+             * @description Viewport width in pixels (if available)
+             */
+            viewport_width?: number;
+            /**
+             * Format: int32
+             * @description Viewport height in pixels (if available)
+             */
+            viewport_height?: number;
         };
         /** TabOrder */
         TabOrder: {

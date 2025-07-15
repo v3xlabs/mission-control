@@ -30,6 +30,7 @@ pub trait TabRepository {
     async fn update(&self, id: &str, request: UpdateTabRequest) -> Result<Option<Tab>>;
     async fn delete(&self, id: &str) -> Result<bool>;
     async fn update_url(&self, id: &str, url: &str) -> Result<()>;
+    async fn update_viewport_dimensions(&self, id: &str, width: i32, height: i32) -> Result<()>;
 }
 
 #[async_trait]

@@ -29,6 +29,10 @@ pub struct TabInfo {
     pub order_index: usize,
     /// Whether this tab persists in browser memory
     pub persist: bool,
+    /// Viewport width in pixels (if available)
+    pub viewport_width: Option<i32>,
+    /// Viewport height in pixels (if available)
+    pub viewport_height: Option<i32>,
 }
 
 /// Current device status

@@ -55,6 +55,8 @@ async fn run_migrations(pool: &SqlitePool) -> Result<()> {
             name TEXT NOT NULL,
             url TEXT NOT NULL,
             persist BOOLEAN NOT NULL DEFAULT TRUE,
+            viewport_width INTEGER,
+            viewport_height INTEGER,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -91,6 +93,13 @@ async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_playlist_tabs_order ON playlist_tabs(playlist_id, order_index)")
         .execute(pool).await?;
+    
+    // Add viewport dimensions columns if they don't exist (for existing databases)
+    let _ = sqlx::query("ALTER TABLE tabs ADD COLUMN viewport_width INTEGER")
+        .execute(pool).await; // Ignore errors if column already exists
+    
+    let _ = sqlx::query("ALTER TABLE tabs ADD COLUMN viewport_height INTEGER")
+        .execute(pool).await; // Ignore errors if column already exists
     
     Ok(())
 }

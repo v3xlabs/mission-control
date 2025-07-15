@@ -168,6 +168,8 @@ impl ManagementApi {
                 url: tab.url,
                 order_index: 0,
                 persist: tab.persist,
+                viewport_width: tab.viewport_width,
+                viewport_height: tab.viewport_height,
             }),
             Err(e) => Json(TabInfo {
                 id: "error".to_string(),
@@ -175,6 +177,8 @@ impl ManagementApi {
                 url: "".to_string(),
                 order_index: 0,
                 persist: false,
+                viewport_width: None,
+                viewport_height: None,
             })
         }
     }
@@ -189,6 +193,8 @@ impl ManagementApi {
                 url: tab.url,
                 order_index: 0,
                 persist: tab.persist,
+                viewport_width: tab.viewport_width,
+                viewport_height: tab.viewport_height,
             }),
             Ok(None) => Json(TabInfo {
                 id: "not_found".to_string(),
@@ -196,6 +202,8 @@ impl ManagementApi {
                 url: "".to_string(),
                 order_index: 0,
                 persist: false,
+                viewport_width: None,
+                viewport_height: None,
             }),
             Err(e) => Json(TabInfo {
                 id: "error".to_string(),
@@ -203,6 +211,8 @@ impl ManagementApi {
                 url: "".to_string(),
                 order_index: 0,
                 persist: false,
+                viewport_width: None,
+                viewport_height: None,
             })
         }
     }
@@ -278,6 +288,8 @@ impl ManagementApi {
                 url: tab.url,
                 order_index: tab.order_index as usize,
                 persist: tab.persist,
+                viewport_width: tab.viewport_width,
+                viewport_height: tab.viewport_height,
             });
         }
 

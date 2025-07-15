@@ -23,13 +23,15 @@ impl TabRepository for SqliteTabRepository {
         let persist = request.persist.unwrap_or(true);
         
         sqlx::query(
-            "INSERT INTO tabs (id, name, url, persist, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO tabs (id, name, url, persist, viewport_width, viewport_height, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&request.id)
         .bind(&request.name)
         .bind(&request.url)
         .bind(persist)
+        .bind(None::<i32>)  // viewport_width
+        .bind(None::<i32>)  // viewport_height
         .bind(now)
         .bind(now)
         .execute(&self.pool)
@@ -40,6 +42,8 @@ impl TabRepository for SqliteTabRepository {
             name: request.name,
             url: request.url,
             persist,
+            viewport_width: None,
+            viewport_height: None,
             created_at: now,
             updated_at: now,
         })
@@ -47,7 +51,7 @@ impl TabRepository for SqliteTabRepository {
     
     async fn get_by_id(&self, id: &str) -> Result<Option<Tab>> {
         let row = sqlx::query(
-            "SELECT id, name, url, persist, created_at, updated_at 
+            "SELECT id, name, url, persist, viewport_width, viewport_height, created_at, updated_at 
              FROM tabs WHERE id = ?"
         )
         .bind(id)
@@ -60,6 +64,8 @@ impl TabRepository for SqliteTabRepository {
                 name: row.get("name"),
                 url: row.get("url"),
                 persist: row.get("persist"),
+                viewport_width: row.get("viewport_width"),
+                viewport_height: row.get("viewport_height"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             }))
@@ -70,7 +76,7 @@ impl TabRepository for SqliteTabRepository {
     
     async fn get_all(&self) -> Result<Vec<Tab>> {
         let rows = sqlx::query(
-            "SELECT id, name, url, persist, created_at, updated_at 
+            "SELECT id, name, url, persist, viewport_width, viewport_height, created_at, updated_at 
              FROM tabs ORDER BY created_at DESC"
         )
         .fetch_all(&self.pool)
@@ -83,6 +89,8 @@ impl TabRepository for SqliteTabRepository {
                 name: row.get("name"),
                 url: row.get("url"),
                 persist: row.get("persist"),
+                viewport_width: row.get("viewport_width"),
+                viewport_height: row.get("viewport_height"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             });
@@ -157,6 +165,20 @@ impl TabRepository for SqliteTabRepository {
         
         sqlx::query("UPDATE tabs SET url = ?, updated_at = ? WHERE id = ?")
             .bind(url)
+            .bind(now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        
+        Ok(())
+    }
+
+    async fn update_viewport_dimensions(&self, id: &str, width: i32, height: i32) -> Result<()> {
+        let now = Utc::now();
+        
+        sqlx::query("UPDATE tabs SET viewport_width = ?, viewport_height = ?, updated_at = ? WHERE id = ?")
+            .bind(width)
+            .bind(height)
             .bind(now)
             .bind(id)
             .execute(&self.pool)

@@ -70,12 +70,24 @@ export const TabList: FC<Props> = ({ playlistId }) => {
               activateTab.isPending ? "opacity-50 cursor-not-allowed" : ""
             )}
           >
-            <div className="h-24 object-cover aspect-video rounded border overflow-hidden">
+            <div 
+              className="h-24 object-cover rounded border overflow-hidden"
+              style={{
+                aspectRatio: tab.viewport_width && tab.viewport_height 
+                  ? `${tab.viewport_width} / ${tab.viewport_height}`
+                  : '16 / 9' // fallback to 16:9 if dimensions not available
+              }}
+            >
               <img
                 src={imgSrc}
                 alt={tab.name}
                 onError={() => handleImgError(tab.id)}
-                className="h-full w-full object-cover aspect-video"
+                className="h-full w-full object-cover"
+                style={{
+                  aspectRatio: tab.viewport_width && tab.viewport_height 
+                    ? `${tab.viewport_width} / ${tab.viewport_height}`
+                    : '16 / 9' // fallback to 16:9 if dimensions not available
+                }}
               />
             </div>
             <div className="flex-1">

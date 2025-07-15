@@ -19,6 +19,8 @@ pub struct Tab {
     pub name: String,
     pub url: String,
     pub persist: bool,
+    pub viewport_width: Option<i32>,
+    pub viewport_height: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -56,6 +58,8 @@ pub struct TabWithOrder {
     pub name: String,
     pub url: String,
     pub persist: bool,
+    pub viewport_width: Option<i32>,
+    pub viewport_height: Option<i32>,
     pub order_index: i64,
     pub duration_seconds: Option<i64>,
     pub created_at: DateTime<Utc>,

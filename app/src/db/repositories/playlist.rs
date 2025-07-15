@@ -95,7 +95,7 @@ impl PlaylistRepository for SqlitePlaylistRepository {
         
         if let Some(playlist) = playlist {
             let rows = sqlx::query(
-                "SELECT t.id, t.name, t.url, t.persist, pt.order_index, pt.duration_seconds, t.created_at, t.updated_at
+                "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, pt.order_index, pt.duration_seconds, t.created_at, t.updated_at
                  FROM tabs t
                  JOIN playlist_tabs pt ON t.id = pt.tab_id
                  WHERE pt.playlist_id = ?
@@ -112,6 +112,8 @@ impl PlaylistRepository for SqlitePlaylistRepository {
                     name: row.get("name"),
                     url: row.get("url"),
                     persist: row.get("persist"),
+                    viewport_width: row.get("viewport_width"),
+                    viewport_height: row.get("viewport_height"),
                     order_index: row.get("order_index"),
                     duration_seconds: row.get("duration_seconds"),
                     created_at: row.get("created_at"),
@@ -248,7 +250,7 @@ impl PlaylistRepository for SqlitePlaylistRepository {
 
     async fn get_tabs(&self, playlist_id: &str) -> Result<Vec<Tab>> {
         let rows = sqlx::query(
-            "SELECT t.id, t.name, t.url, t.persist, t.created_at, t.updated_at
+            "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, t.created_at, t.updated_at
              FROM tabs t
              JOIN playlist_tabs pt ON t.id = pt.tab_id
              WHERE pt.playlist_id = ?
@@ -265,6 +267,8 @@ impl PlaylistRepository for SqlitePlaylistRepository {
                 name: row.get("name"),
                 url: row.get("url"),
                 persist: row.get("persist"),
+                viewport_width: row.get("viewport_width"),
+                viewport_height: row.get("viewport_height"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             });

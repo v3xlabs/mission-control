@@ -31,6 +31,7 @@ pub struct ChromeController {
     pub should_screen_capture: Arc<Mutex<bool>>,
     pub last_frame: Arc<Mutex<HashMap<String, Vec<u8>>>>, // Key is tab_id
     pub pages: Arc<Mutex<HashMap<String, Page>>>,        // Key is tab_id
+    pub viewport_dimensions: Arc<Mutex<HashMap<String, (i32, i32)>>>, // Key is tab_id, Value is (width, height)
     pub browser: Arc<Mutex<Option<Arc<Browser>>>>,
     pub message_sender: Sender<ChromeMessage>,
     pub message_receiver: Arc<Mutex<Receiver<ChromeMessage>>>,
@@ -47,6 +48,7 @@ impl ChromeController {
             should_screen_capture: Arc::new(Mutex::new(true)),
             last_frame: Arc::new(Mutex::new(HashMap::new())),
             pages: Arc::new(Mutex::new(HashMap::new())),
+            viewport_dimensions: Arc::new(Mutex::new(HashMap::new())),
             browser: Arc::new(Mutex::new(None)),
             message_sender,
             message_receiver: Arc::new(Mutex::new(message_receiver)),
@@ -151,14 +153,14 @@ impl ChromeController {
         
         for tab in tabs {
             if tab.persist {
-                self.create_tab_page(&tab.id, &tab.url).await?;
+                self.create_tab_page(&tab.id, &tab.url, app_state).await?;
             }
         }
 
         Ok(())
     }
 
-    async fn create_tab_page(&self, tab_id: &str, url: &str) -> Result<()> {
+    async fn create_tab_page(&self, tab_id: &str, url: &str, app_state: &Arc<AppState>) -> Result<()> {
         let browser_opt = self.browser.lock().await;
         if let Some(browser) = browser_opt.as_ref() {
             info!("Creating new page for tab {} with URL: {}", tab_id, url);
@@ -211,6 +213,37 @@ impl ChromeController {
                         error!("Failed to create event listener for tab: {}", tab_id_clone);
                     }
                 });
+            }
+
+            // Get viewport dimensions using JavaScript evaluation
+            if let Ok(width_result) = page.evaluate("window.innerWidth").await {
+                if let Ok(height_result) = page.evaluate("window.innerHeight").await {
+                    if let (Some(width_val), Some(height_val)) = (width_result.value(), height_result.value()) {
+                        if let (Some(width), Some(height)) = (width_val.as_u64(), height_val.as_u64()) {
+                                                    let width = width as i32;
+                        let height = height as i32;
+                        self.viewport_dimensions.lock().await.insert(tab_id.to_string(), (width, height));
+                        info!("Captured viewport dimensions for tab {}: {}x{}", tab_id, width, height);
+                        
+                        // Update database with viewport dimensions
+                        let app_state = app_state.clone();
+                        let tab_id_clone = tab_id.to_string();
+                        task::spawn(async move {
+                            if let Err(e) = app_state.tab_repository.update_viewport_dimensions(&tab_id_clone, width, height).await {
+                                error!("Failed to update viewport dimensions in database for tab {}: {}", tab_id_clone, e);
+                            }
+                        });
+                        } else {
+                            warn!("Failed to parse viewport dimensions for tab: {}", tab_id);
+                        }
+                    } else {
+                        warn!("Failed to get viewport dimension values for tab: {}", tab_id);
+                    }
+                } else {
+                    warn!("Failed to get viewport height for tab: {}", tab_id);
+                }
+            } else {
+                warn!("Failed to get viewport width for tab: {}", tab_id);
             }
 
             self.pages.lock().await.insert(tab_id.to_string(), page);
@@ -376,7 +409,7 @@ impl ChromeController {
         // Create page if it doesn't exist
         if !self.pages.lock().await.contains_key(&tab_id) {
             info!("Creating new page for tab: {}", tab_id);
-            self.create_tab_page(&tab_id, &tab.url).await?;
+            self.create_tab_page(&tab_id, &tab.url, app_state).await?;
         } else {
             info!("Page already exists for tab: {}", tab_id);
         }
@@ -602,8 +635,9 @@ impl ChromeController {
             page.close().await?;
         }
 
-        // Remove from frame cache
+        // Remove from frame cache and viewport dimensions
         self.last_frame.lock().await.remove(&tab_id);
+        self.viewport_dimensions.lock().await.remove(&tab_id);
 
         Ok(())
     }
@@ -628,6 +662,10 @@ impl ChromeController {
     pub async fn get_screenshot(&self, tab_id: &str) -> Option<Vec<u8>> {
         self.last_frame.lock().await.get(tab_id).cloned()
     }
+
+    pub async fn get_viewport_dimensions(&self, tab_id: &str) -> Option<(i32, i32)> {
+        self.viewport_dimensions.lock().await.get(tab_id).cloned()
+    }
 }
 
 // Implement Clone for ChromeController
@@ -640,6 +678,7 @@ impl Clone for ChromeController {
             should_screen_capture: self.should_screen_capture.clone(),
             last_frame: self.last_frame.clone(),
             pages: self.pages.clone(),
+            viewport_dimensions: self.viewport_dimensions.clone(),
             browser: self.browser.clone(),
             message_sender,
             message_receiver: Arc::new(Mutex::new(message_receiver)),
