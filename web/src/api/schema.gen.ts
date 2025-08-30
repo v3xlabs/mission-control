@@ -476,6 +476,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tabs/{tab_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh a tab (reload page) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tabs/{tab_id}/recreate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recreate a tab (close and reopen) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playlists/{playlist_id}/tabs/{tab_id}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Toggle tab enabled state in playlist */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    playlist_id: string;
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["ToggleTabEnabledRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -487,6 +603,7 @@ export interface components {
             order_index: number;
             /** Format: int64 */
             duration_seconds?: number;
+            enabled?: boolean;
         };
         /** CreatePlaylistRequest */
         CreatePlaylistRequest: {
@@ -520,6 +637,11 @@ export interface components {
              * @description Uptime in seconds
              */
             uptime_seconds: number;
+            /**
+             * Format: uint64
+             * @description When the current tab was opened (seconds since epoch, if available)
+             */
+            current_tab_opened_at?: number;
         };
         /**
          * PlaylistInfo
@@ -581,6 +703,10 @@ export interface components {
             tab_id: string;
             /** Format: int64 */
             order_index: number;
+        };
+        /** ToggleTabEnabledRequest */
+        ToggleTabEnabledRequest: {
+            enabled: boolean;
         };
         /** UpdatePlaylistRequest */
         UpdatePlaylistRequest: {

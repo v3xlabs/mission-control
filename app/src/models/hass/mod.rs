@@ -22,8 +22,26 @@ pub struct HassManager {
 }
 
 impl HassManager {
+    pub fn disabled() -> Self {
+        // Create a dummy MQTT client that won't be used
+        let mut mqttoptions = MqttOptions::new("disabled", "localhost", 1883);
+        mqttoptions.set_keep_alive(Duration::from_secs(60));
+        let (mqtt_client, _) = Client::new(mqttoptions, 10);
+        
+        Self {
+            mqtt_client,
+            availability_topic: String::new(),
+            brightness_entity: HassEntity::new_brightness(String::new(), String::new(), String::new(), None),
+            backlight_entity: HassEntity::new_backlight(String::new(), String::new(), String::new(), None),
+            playlist_entity: HassEntity::new_playlist(String::new(), String::new(), String::new(), None, None),
+            tab_entity: HassEntity::new_tab(String::new(), String::new(), String::new()),
+            url_entity: HassEntity::new_url(String::new(), String::new(), String::new()),
+        }
+    }
+
     pub async fn new(config: &Config) -> (Self, Connection) {
-        let mqtt_url = config.homeassistant.mqtt.url.parse::<Url>().unwrap();
+        let hass_config = config.homeassistant.as_ref().expect("HomeAssistant config required");
+        let mqtt_url = hass_config.mqtt.url.parse::<Url>().unwrap();
         let mqtt_port = mqtt_url.port().unwrap_or(1883);
 
         let mqtt_url = mqtt_url.host_str().unwrap();
@@ -46,8 +64,8 @@ impl HassManager {
             true,
         ));
 
-        if let Some(username) = &config.homeassistant.mqtt.username {
-            if let Some(password) = &config.homeassistant.mqtt.password {
+        if let Some(username) = &hass_config.mqtt.username {
+            if let Some(password) = &hass_config.mqtt.password {
                 info!(
                     "Setting credentials for MQTT connection {} {}",
                     username, password
@@ -151,6 +169,11 @@ impl HassManager {
     }
 
     pub async fn init(&self) {
+        // Skip initialization if MQTT is disabled
+        if self.availability_topic.is_empty() {
+            return;
+        }
+        
         self.mqtt_client
             .publish(&self.availability_topic, QoS::AtLeastOnce, true, "online")
             .unwrap();
@@ -169,9 +192,9 @@ impl HassManager {
     }
 
     pub async fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
-        let mut error_count = 0;
+        let mut _error_count = 0;
 
-        for (i, notification) in connection.iter().enumerate() {
+        for (_i, notification) in connection.iter().enumerate() {
             info!("Notification: {:?}", notification);
 
             match notification {
@@ -214,7 +237,7 @@ impl HassManager {
                     }
                 }
                 Err(e) => {
-                    error_count += 1;
+                    _error_count += 1;
                     info!("Error: {:?}", e);
 
                     // if error_count > 10 {

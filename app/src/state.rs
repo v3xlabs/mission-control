@@ -27,9 +27,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new(config: Config, db_pool: SqlitePool) -> (Self, Connection) {
-        let (hass, connection) = HassManager::new(&config).await;
-        let hass = Arc::new(hass);
+    pub async fn new(config: Config, db_pool: SqlitePool) -> (Self, Option<Connection>) {
+        let (hass, connection) = if config.homeassistant.is_some() {
+            let (h, c) = HassManager::new(&config).await;
+            (Arc::new(h), Some(c))
+        } else {
+            (Arc::new(HassManager::disabled()), None)
+        };
         let chrome = Arc::new(ChromeController::new());
 
         // Initialize repositories

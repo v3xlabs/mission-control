@@ -95,7 +95,9 @@ impl PlaylistRepository for SqlitePlaylistRepository {
         
         if let Some(playlist) = playlist {
             let rows = sqlx::query(
-                "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, pt.order_index, pt.duration_seconds, t.created_at, t.updated_at
+                "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, 
+                        pt.order_index, pt.duration_seconds, pt.enabled, pt.last_manual_activation,
+                        t.created_at, t.updated_at
                  FROM tabs t
                  JOIN playlist_tabs pt ON t.id = pt.tab_id
                  WHERE pt.playlist_id = ?
@@ -116,6 +118,8 @@ impl PlaylistRepository for SqlitePlaylistRepository {
                     viewport_height: row.get("viewport_height"),
                     order_index: row.get("order_index"),
                     duration_seconds: row.get("duration_seconds"),
+                    enabled: row.get("enabled"),
+                    last_manual_activation: row.get("last_manual_activation"),
                     created_at: row.get("created_at"),
                     updated_at: row.get("updated_at"),
                 });

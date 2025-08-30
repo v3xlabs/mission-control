@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         db::import_config_data(&db_pool, chromium_config).await?;
     }
 
-    let (state, mut connection) = AppState::new(config, db_pool).await;
+    let (state, connection) = AppState::new(config, db_pool).await;
     let state = Arc::new(state);
 
     if let Some(chromium_config) = &state.config.chromium {
@@ -46,14 +46,26 @@ async fn main() -> Result<()> {
         }
     }
 
-    state.hass.init().await;
+    // Initialize Home Assistant if configured
+    if connection.is_some() {
+        state.hass.init().await;
+    }
 
     let http_state = state.clone();
     task::spawn(async move {
         http::start_http(http_state).await.unwrap();
     });
 
-    state.hass.run(&mut connection, &state).await;
+    // Run Home Assistant MQTT loop if connection exists
+    if let Some(mut conn) = connection {
+        state.hass.run(&mut conn, &state).await;
+    } else {
+        info!("Home Assistant integration disabled - running without MQTT");
+        // Keep the main thread alive
+        loop {
+            task::sleep(std::time::Duration::from_secs(60)).await;
+        }
+    }
 
     Ok(())
 }

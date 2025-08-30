@@ -31,6 +31,8 @@ pub struct PlaylistTab {
     pub tab_id: String,
     pub order_index: i64,
     pub duration_seconds: Option<i64>,
+    pub enabled: bool,
+    pub last_manual_activation: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -62,6 +64,8 @@ pub struct TabWithOrder {
     pub viewport_height: Option<i32>,
     pub order_index: i64,
     pub duration_seconds: Option<i64>,
+    pub enabled: bool,
+    pub last_manual_activation: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -101,6 +105,7 @@ pub struct AddTabToPlaylistRequest {
     pub tab_id: String,
     pub order_index: i64,
     pub duration_seconds: Option<i64>,
+    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
@@ -112,4 +117,9 @@ pub struct ReorderTabsRequest {
 pub struct TabOrder {
     pub tab_id: String,
     pub order_index: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+pub struct ToggleTabEnabledRequest {
+    pub enabled: bool,
 } 

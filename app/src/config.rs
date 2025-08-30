@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub homeassistant: HomeAssistantConfig,
+    pub homeassistant: Option<HomeAssistantConfig>,
     pub device: DeviceConfig,
     pub display: DisplayConfig,
     pub chromium: Option<ChromiumConfig>,

@@ -53,6 +53,7 @@ impl ManagementApi {
                 current_playlist: None,
                 current_tab: None,
                 uptime_seconds: 0,
+                current_tab_opened_at: None,
             });
         Json(status)
     }
@@ -63,15 +64,26 @@ impl ManagementApi {
         let pid = playlist_id.0.clone();
         tracing::info!("API: Activating playlist {}", pid);
         
-        // Send message to Chrome controller
-        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
+        // Send message to Chrome controller and wait for response
+        match crate::chrome::send_chrome_message_with_response(&self.state.chrome, 
             crate::chrome::ChromeMessage::ActivatePlaylist { playlist_id: pid.clone() }).await {
-            tracing::error!("API: Error activating playlist {}: {}", pid, e);
-            return poem_openapi::payload::PlainText(format!("Error activating playlist: {}", e));
+            Ok(crate::chrome::ChromeResponse::Success) => {
+                tracing::info!("API: Successfully activated playlist {}", pid);
+                poem_openapi::payload::PlainText("ok".into())
+            }
+            Ok(crate::chrome::ChromeResponse::Error { message }) => {
+                tracing::error!("API: Error activating playlist {}: {}", pid, message);
+                poem_openapi::payload::PlainText(format!("Error activating playlist: {}", message))
+            }
+            Ok(response) => {
+                tracing::warn!("API: Unexpected response activating playlist {}: {:?}", pid, response);
+                poem_openapi::payload::PlainText(format!("Unexpected response: {:?}", response))
+            }
+            Err(e) => {
+                tracing::error!("API: Error activating playlist {}: {}", pid, e);
+                poem_openapi::payload::PlainText(format!("Error activating playlist: {}", e))
+            }
         }
-        
-        tracing::info!("API: Successfully sent activate playlist message for {}", pid);
-        poem_openapi::payload::PlainText("ok".into())
     }
 
     /// Activate a tab immediately
@@ -80,6 +92,11 @@ impl ManagementApi {
         let pid = playlist_id.0.clone();
         let tid = tab_id.0.clone();
         tracing::info!("API: Activating tab {} in playlist {}", tid, pid);
+
+        // Update manual activation timestamp
+        if let Err(e) = self.state.playlist_tab_repository.update_manual_activation(&pid, &tid).await {
+            tracing::warn!("API: Failed to update manual activation timestamp for tab {}: {}", tid, e);
+        }
 
         // Send message to Chrome controller to activate tab
         if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
@@ -254,6 +271,50 @@ impl ManagementApi {
             Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
         }
     }
+
+    /// Refresh a tab (reload page)
+    #[oai(path = "/tabs/:tab_id/refresh", method = "post")]
+    async fn refresh_tab(&self, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        let tid = tab_id.0.clone();
+        tracing::info!("API: Refreshing tab {}", tid);
+
+        // Send message to Chrome controller to refresh tab
+        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
+            crate::chrome::ChromeMessage::RefreshTab { tab_id: tid.clone() }).await {
+            tracing::error!("API: Error refreshing tab {}: {}", tid, e);
+            return poem_openapi::payload::PlainText(format!("Error refreshing tab: {}", e));
+        }
+
+        tracing::info!("API: Successfully sent refresh tab message for {}", tid);
+        poem_openapi::payload::PlainText("Tab refresh initiated".to_string())
+    }
+
+    /// Recreate a tab (close and reopen)
+    #[oai(path = "/tabs/:tab_id/recreate", method = "post")]
+    async fn recreate_tab(&self, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+        let tid = tab_id.0.clone();
+        tracing::info!("API: Recreating tab {}", tid);
+
+        // Send message to Chrome controller to recreate tab
+        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
+            crate::chrome::ChromeMessage::RecreateTab { tab_id: tid.clone() }).await {
+            tracing::error!("API: Error recreating tab {}: {}", tid, e);
+            return poem_openapi::payload::PlainText(format!("Error recreating tab: {}", e));
+        }
+
+        tracing::info!("API: Successfully sent recreate tab message for {}", tid);
+        poem_openapi::payload::PlainText("Tab recreation initiated".to_string())
+    }
+
+    /// Toggle tab enabled state in playlist
+    #[oai(path = "/playlists/:playlist_id/tabs/:tab_id/toggle", method = "put")]
+    async fn toggle_tab_enabled(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::ToggleTabEnabledRequest>) -> poem_openapi::payload::PlainText<String> {
+        match self.state.playlist_tab_repository.toggle_tab_enabled(&playlist_id.0, &tab_id.0, request.enabled).await {
+            Ok(true) => poem_openapi::payload::PlainText(format!("Tab {} in playlist {}", if request.enabled { "enabled" } else { "disabled" }, "successfully")),
+            Ok(false) => poem_openapi::payload::PlainText("Tab not found in playlist".to_string()),
+            Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
+        }
+    }
 }
 
 impl ManagementApi {
@@ -300,6 +361,9 @@ impl ManagementApi {
         let chrome_state = self.state.chrome.state.lock().await;
         let current_playlist = chrome_state.current_playlist_id.clone();
         let current_tab = chrome_state.current_tab_id.clone();
+        let current_tab_opened_at = chrome_state.current_tab_opened_at
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs());
 
         // Log state for debugging
         tracing::info!("Chrome state - playlist: {:?}, tab: {:?}, running: {}", 
@@ -311,6 +375,7 @@ impl ManagementApi {
             current_playlist,
             current_tab,
             uptime_seconds: 0, // TODO: Calculate uptime
+            current_tab_opened_at,
         })
     }
 }

@@ -1,24 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApi } from "../api/api";
+import { apiRequest } from "../api/api";
 
-const activatePlaylist = () => {
-  return {
+export const useActivatePlaylist = () => {
+  const qc = useQueryClient();
+  
+  return useMutation({
     mutationFn: async (playlistId: string) => {
-      const response = await useApi('/playlists/{playlist_id}/activate', 'post', {
+      const response = await apiRequest('/playlists/{playlist_id}/activate', 'post', {
         path: {
           playlist_id: playlistId,
         },
       });
       return response.data;
     },
-  };
-};
-
-export const useActivatePlaylist = () => {
-  const qc = useQueryClient();
-  
-  return useMutation({
-    ...activatePlaylist(),
     onMutate: async (playlistId: string) => {
       // Only optimistically update the current playlist from status API
       qc.setQueryData(['status'], (old: any) => {
@@ -32,10 +26,12 @@ export const useActivatePlaylist = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["status"] });
+      qc.invalidateQueries({ queryKey: ["playlists"] });
     },
     onError: () => {
       // Revert optimistic updates on error
       qc.invalidateQueries({ queryKey: ["status"] });
+      qc.invalidateQueries({ queryKey: ["playlists"] });
     },
   });
 }; 

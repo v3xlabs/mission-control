@@ -12,7 +12,8 @@ interface Props {
 }
 
 export const TabList: FC<Props> = ({ playlistId }) => {
-  const { currentPlaylist, currentTab } = useCurrentPlaylist();
+  const { data: currentPlaylist } = useCurrentPlaylist();
+  const currentTab = ""; // TODO: need to add current tab to status
   const currentTabId =
     currentPlaylist === playlistId ? currentTab : null;
 
@@ -54,7 +55,7 @@ export const TabList: FC<Props> = ({ playlistId }) => {
   if (error || !data) return <div>Error loading tabs</div>;
 
   return (
-    <ul className="space-y-2">
+    <ul className="flex gap-2 flex-wrap">
       {data.map((tab: TabInfo) => {
         const isActive = tab.id === currentTabId;
         const imgSrc = isActive
@@ -94,7 +95,7 @@ export const TabList: FC<Props> = ({ playlistId }) => {
               <div className="text-sm">{tab.name}</div>
               <a
                 href={tab.url}
-                className="text-xs text-blue-400 hover:underline"
+                className="text-xs text-gray-300 hover:text-gray-200 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >

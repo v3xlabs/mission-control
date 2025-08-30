@@ -1,6 +1,6 @@
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
-    SinkExt, StreamExt, FutureExt, pin_mut,
+    SinkExt, StreamExt,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::{error, info, warn};
@@ -257,28 +257,48 @@ impl ChromeController {
     }
 
     async fn run_message_handler(&self, app_state: Arc<AppState>, config: ChromiumConfig) {
-        let mut message_receiver = self.message_receiver.lock().await;
         info!("Chrome message handler started");
         
-        while let Some(message) = message_receiver.next().await {
+        loop {
+            // Get the next message from the receiver
+            let message = {
+                let mut message_receiver = self.message_receiver.lock().await;
+                match message_receiver.next().await {
+                    Some(msg) => msg,
+                    None => {
+                        error!("Chrome message receiver channel closed!");
+                        break;
+                    }
+                }
+            };
+            
             info!("Chrome message handler received message: {:?}", message);
-            match self.handle_message(message, &app_state, &config).await {
-                Ok(response) => {
-                    info!("Chrome message handled successfully, response: {:?}", response);
-                    if let Some(sender) = &*self.response_sender.lock().await {
-                        let _ = sender.clone().send(response).await;
+            
+            // Handle each message in a separate task to prevent blocking the loop
+            let controller = self.clone();
+            let app_state_clone = app_state.clone();
+            let config_clone = config.clone();
+            
+            task::spawn(async move {
+                match controller.handle_message(message, &app_state_clone, &config_clone).await {
+                    Ok(response) => {
+                        info!("Chrome message handled successfully, response: {:?}", response);
+                        if let Some(sender) = &*controller.response_sender.lock().await {
+                            let _ = sender.clone().send(response).await;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error handling Chrome message: {}", e);
+                        if let Some(sender) = &*controller.response_sender.lock().await {
+                            let _ = sender.clone().send(ChromeResponse::Error { 
+                                message: e.to_string() 
+                            }).await;
+                        }
                     }
                 }
-                Err(e) => {
-                    error!("Error handling Chrome message: {}", e);
-                    if let Some(sender) = &*self.response_sender.lock().await {
-                        let _ = sender.clone().send(ChromeResponse::Error { 
-                            message: e.to_string() 
-                        }).await;
-                    }
-                }
-            }
+            });
         }
+        error!("Chrome message handler loop exited - this should not happen!");
     }
 
 
@@ -291,7 +311,7 @@ impl ChromeController {
                 Ok(ChromeResponse::Success)
             }
             ChromeMessage::ActivateTab { tab_id, playlist_id } => {
-                self.activate_tab(tab_id, playlist_id, app_state).await?;
+                self.activate_tab_manual(tab_id, playlist_id, app_state).await?;
                 Ok(ChromeResponse::Success)
             }
             ChromeMessage::StopPlaylist => {
@@ -324,6 +344,14 @@ impl ChromeController {
             }
             ChromeMessage::CloseTab { tab_id } => {
                 self.close_tab(tab_id).await?;
+                Ok(ChromeResponse::Success)
+            }
+            ChromeMessage::RefreshTab { tab_id } => {
+                self.refresh_tab(tab_id).await?;
+                Ok(ChromeResponse::Success)
+            }
+            ChromeMessage::RecreateTab { tab_id } => {
+                self.recreate_tab(tab_id, app_state).await?;
                 Ok(ChromeResponse::Success)
             }
             ChromeMessage::GetStatus => {
@@ -381,21 +409,68 @@ impl ChromeController {
                 playlist_id, state.current_tab_index, state.is_running);
         }
 
-        // Start with first tab
+        // Create pages for all tabs in the playlist
+        info!("Creating pages for all {} tabs in playlist {}", tabs.len(), playlist_id);
+        for tab in &tabs {
+            if !self.pages.lock().await.contains_key(&tab.id) {
+                info!("Creating page for tab: {} - {}", tab.name, tab.url);
+                self.create_tab_page(&tab.id, &tab.url, app_state).await?;
+            } else {
+                info!("Page already exists for tab: {}", tab.id);
+            }
+        }
+
+        // Start auto-rotation BEFORE tab activation to ensure it always starts
+        info!("Checking auto-rotation: playlist.interval_seconds = {}", playlist.interval_seconds);
+        if playlist.interval_seconds > 0 {
+            // Check if we're already running this playlist with auto-rotation
+            let current_state = self.state.lock().await;
+            let already_running = current_state.auto_rotate && 
+                                current_state.current_playlist_id.as_ref() == Some(&playlist_id);
+            drop(current_state);
+            
+            if !already_running {
+                info!("Starting auto-rotation for playlist {} with interval {} seconds", playlist_id, playlist.interval_seconds);
+                self.start_auto_rotation(playlist_id.clone(), playlist.interval_seconds, app_state).await?;
+            } else {
+                info!("Auto-rotation already running for playlist {}", playlist_id);
+            }
+        } else {
+            info!("Auto-rotation NOT started: interval_seconds is {}", playlist.interval_seconds);
+        }
+
+        // Start with first tab (do this after auto-rotation to avoid blocking)
         let first_tab = &tabs[0];
         info!("Activating first tab: {} ({}) in playlist {}", first_tab.name, first_tab.id, playlist_id);
-        self.activate_tab(first_tab.id.clone(), playlist_id.clone(), app_state).await?;
-
-        // Start auto-rotation if enabled
-        if playlist.interval_seconds > 0 {
-            info!("Starting auto-rotation for playlist {} with interval {} seconds", playlist_id, playlist.interval_seconds);
-            self.start_auto_rotation(playlist_id, playlist.interval_seconds, app_state).await?;
+        
+        // Use a timeout for tab activation to prevent hanging
+        let tab_activation_future = self.activate_tab(first_tab.id.clone(), playlist_id.clone(), app_state);
+        let timeout_duration = Duration::from_secs(5); // 5 second timeout
+        
+        match async_std::future::timeout(timeout_duration, tab_activation_future).await {
+            Ok(Ok(_)) => {
+                info!("First tab activated successfully");
+            }
+            Ok(Err(e)) => {
+                warn!("Failed to activate first tab: {}", e);
+            }
+            Err(_) => {
+                warn!("Tab activation timed out after 5 seconds");
+            }
         }
 
         Ok(())
     }
 
     async fn activate_tab(&self, tab_id: String, playlist_id: String, app_state: &Arc<AppState>) -> Result<()> {
+        self.activate_tab_internal(tab_id, playlist_id, app_state, false).await
+    }
+    
+    async fn activate_tab_manual(&self, tab_id: String, playlist_id: String, app_state: &Arc<AppState>) -> Result<()> {
+        self.activate_tab_internal(tab_id, playlist_id, app_state, true).await
+    }
+
+    async fn activate_tab_internal(&self, tab_id: String, playlist_id: String, app_state: &Arc<AppState>, is_manual: bool) -> Result<()> {
         info!("Activating tab: {}", tab_id);
 
         // Get tab from database
@@ -429,6 +504,7 @@ impl ChromeController {
             let mut state = self.state.lock().await;
             state.current_tab_id = Some(tab_id.clone());
             state.current_playlist_id = Some(playlist_id.clone());
+            state.current_tab_opened_at = Some(std::time::SystemTime::now());
             info!("Updated controller state - current_tab_id: {}", tab_id);
         }
 
@@ -436,55 +512,100 @@ impl ChromeController {
         app_state.hass.tab_entity.update_state(&app_state.hass.mqtt_client, &tab.name);
         app_state.hass.url_entity.update_state(&app_state.hass.mqtt_client, &tab.url);
 
+        // If this was a manual activation, restart the auto-rotation timer
+        if is_manual {
+            info!("Manual tab activation detected, restarting auto-rotation timer");
+            let current_playlist_id = {
+                let state = self.state.lock().await;
+                state.current_playlist_id.clone()
+            };
+            
+            if let Some(playlist_id) = current_playlist_id {
+                if let Ok(playlist) = app_state.playlist_repository.get_by_id(&playlist_id).await {
+                    if let Some(playlist) = playlist {
+                        if playlist.interval_seconds > 0 {
+                            self.start_auto_rotation(playlist_id, playlist.interval_seconds, app_state).await?;
+                        }
+                    }
+                }
+            }
+        }
+
         info!("Tab {} activated successfully", tab_id);
         Ok(())
     }
 
     async fn start_auto_rotation(&self, playlist_id: String, interval_seconds: i64, app_state: &Arc<AppState>) -> Result<()> {
-        // Cancel existing timer
-        if let Some(cancel_sender) = &*self.timer_cancel.lock().await {
-            let _ = cancel_sender.clone().send(()).await;
-        }
-
-        // Create new timer
-        let (cancel_sender, mut cancel_receiver) = channel(1);
-        *self.timer_cancel.lock().await = Some(cancel_sender);
-
-        let message_sender = self.message_sender.clone();
-        let state = self.state.clone();
-        let playlist_id_clone = playlist_id.clone();
+        info!("Setting up auto-rotation for playlist {}", playlist_id);
         
-        task::spawn(async move {
-            loop {
-                let sleep_future = sleep(Duration::from_secs(interval_seconds as u64)).fuse();
-                let cancel_future = cancel_receiver.next().fuse();
-                
-                pin_mut!(sleep_future, cancel_future);
-                
-                futures::select! {
-                    _ = sleep_future => {
-                        // Check if we should continue rotating
-                        let current_state = state.lock().await;
-                        if current_state.auto_rotate && current_state.current_playlist_id.as_ref() == Some(&playlist_id_clone) {
-                            drop(current_state);
-                            let _ = message_sender.clone().send(ChromeMessage::NextTab).await;
-                        } else {
-                            break;
-                        }
-                    }
-                    _ = cancel_future => {
-                        info!("Auto-rotation cancelled for playlist {}", playlist_id_clone);
-                        break;
-                    }
-                }
-            }
-        });
+        // Stop existing timer by setting auto_rotate to false temporarily
+        {
+            let mut state = self.state.lock().await;
+            state.auto_rotate = false;
+        }
+        
+        // Give a moment for the old timer to stop
+        sleep(Duration::from_millis(100)).await;
 
-        // Update state
+        // Update state to enable auto-rotation BEFORE spawning the task
         {
             let mut state = self.state.lock().await;
             state.auto_rotate = true;
         }
+
+        let message_sender = self.message_sender.clone();
+        let state = self.state.clone();
+        let playlist_id_clone = playlist_id.clone();
+        let app_state_clone = app_state.clone();
+        
+        // Create a simple timer task that reads current interval from database
+        task::spawn(async move {
+            let mut current_interval = interval_seconds;
+            
+            loop {
+                sleep(Duration::from_secs(current_interval as u64)).await;
+                
+                info!("Auto-rotation timer triggered for playlist {}", playlist_id_clone);
+                
+                // Check if we should continue rotating and get current interval
+                let current_state = state.lock().await;
+                info!("Timer check: auto_rotate={}, current_playlist_id={:?}, target_playlist={}",
+                      current_state.auto_rotate, current_state.current_playlist_id, playlist_id_clone);
+                
+                if current_state.auto_rotate && current_state.current_playlist_id.as_ref() == Some(&playlist_id_clone) {
+                    drop(current_state);
+                    
+                    // Get the current interval from database in case it was updated
+                    match app_state_clone.playlist_repository.get_by_id(&playlist_id_clone).await {
+                        Ok(Some(playlist)) => {
+                            if playlist.interval_seconds != current_interval {
+                                info!("Playlist {} interval updated from {} to {} seconds", 
+                                      playlist_id_clone, current_interval, playlist.interval_seconds);
+                                current_interval = playlist.interval_seconds;
+                            }
+                        },
+                        Ok(None) => {
+                            info!("Playlist {} no longer exists, stopping auto-rotation", playlist_id_clone);
+                            break;
+                        },
+                        Err(e) => {
+                            info!("Failed to get playlist {} from database: {}", playlist_id_clone, e);
+                            // Continue with current interval
+                        }
+                    }
+                    
+                    info!("Sending NextTab message for playlist {}", playlist_id_clone);
+                    if let Err(e) = message_sender.clone().send(ChromeMessage::NextTab).await {
+                        info!("Failed to send NextTab message: {}", e);
+                        break;
+                    }
+                } else {
+                    info!("Auto-rotation stopped - conditions not met");
+                    break;
+                }
+            }
+            info!("Auto-rotation timer task ended for playlist {}", playlist_id_clone);
+        });
 
         info!("Auto-rotation started for playlist {} with {} second intervals", playlist_id, interval_seconds);
         Ok(())
@@ -542,21 +663,35 @@ impl ChromeController {
     }
 
     async fn next_tab(&self, app_state: &Arc<AppState>) -> Result<()> {
-        let (current_playlist_id, current_index) = {
+        let (current_playlist_id, current_tab_id, current_index) = {
             let state = self.state.lock().await;
-            (state.current_playlist_id.clone(), state.current_tab_index)
+            (state.current_playlist_id.clone(), state.current_tab_id.clone(), state.current_tab_index)
         };
 
         if let Some(playlist_id) = current_playlist_id {
             let tabs = app_state.playlist_repository.get_tabs(&playlist_id).await?;
             
             if !tabs.is_empty() {
-                let next_index = (current_index + 1) % tabs.len();
+                // Find the current tab's actual index in the playlist
+                let actual_current_index = if let Some(current_tab_id) = &current_tab_id {
+                    tabs.iter().position(|tab| &tab.id == current_tab_id).unwrap_or(current_index)
+                } else {
+                    current_index
+                };
+                
+                info!("Next tab: current_index={}, actual_index={}, total_tabs={}", 
+                      current_index, actual_current_index, tabs.len());
+                
+                let next_index = (actual_current_index + 1) % tabs.len();
                 let next_tab = &tabs[next_index];
+                
+                info!("Moving from tab {} (index {}) to tab {} (index {})", 
+                      current_tab_id.as_deref().unwrap_or("none"), actual_current_index,
+                      next_tab.id, next_index);
                 
                 self.activate_tab(next_tab.id.clone(), playlist_id.clone(), app_state).await?;
                 
-                // Update state
+                // Update state with correct index
                 {
                     let mut state = self.state.lock().await;
                     state.current_tab_index = next_index;
@@ -642,6 +777,36 @@ impl ChromeController {
         Ok(())
     }
 
+    async fn refresh_tab(&self, tab_id: String) -> Result<()> {
+        info!("Refreshing tab: {}", tab_id);
+        if let Some(page) = self.pages.lock().await.get(&tab_id) {
+            page.reload().await?;
+            info!("Tab {} refreshed successfully", tab_id);
+        } else {
+            warn!("Tab {} not found for refresh", tab_id);
+        }
+        Ok(())
+    }
+
+    async fn recreate_tab(&self, tab_id: String, app_state: &Arc<AppState>) -> Result<()> {
+        info!("Recreating tab: {}", tab_id);
+        
+        // Get tab from database to get URL
+        let tab = match app_state.tab_repository.get_by_id(&tab_id).await? {
+            Some(t) => t,
+            None => return Err(anyhow::anyhow!("Tab {} not found", tab_id)),
+        };
+        
+        // Close existing tab if it exists
+        self.close_tab(tab_id.clone()).await?;
+        
+        // Recreate the tab page
+        self.create_tab_page(&tab_id, &tab.url, app_state).await?;
+        
+        info!("Tab {} recreated successfully", tab_id);
+        Ok(())
+    }
+
     async fn shutdown(&self) -> Result<()> {
         info!("Shutting down Chrome controller");
         
@@ -671,8 +836,6 @@ impl ChromeController {
 // Implement Clone for ChromeController
 impl Clone for ChromeController {
     fn clone(&self) -> Self {
-        let (message_sender, message_receiver) = channel(100);
-        
         Self {
             state: self.state.clone(),
             should_screen_capture: self.should_screen_capture.clone(),
@@ -680,10 +843,10 @@ impl Clone for ChromeController {
             pages: self.pages.clone(),
             viewport_dimensions: self.viewport_dimensions.clone(),
             browser: self.browser.clone(),
-            message_sender,
-            message_receiver: Arc::new(Mutex::new(message_receiver)),
-            response_sender: Arc::new(Mutex::new(None)),
-            timer_cancel: Arc::new(Mutex::new(None)),
+            message_sender: self.message_sender.clone(),  // Use the same sender!
+            message_receiver: self.message_receiver.clone(),  // Use the same receiver!
+            response_sender: self.response_sender.clone(),
+            timer_cancel: self.timer_cancel.clone(),
         }
     }
 } 

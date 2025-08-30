@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApi } from "../api/api";
+import { apiRequest } from "../api/api";
 
-const activateTab = () => {
-  return {
+export const useActivateTab = () => {
+  const qc = useQueryClient();
+  
+  return useMutation({
     mutationFn: async ({ playlistId, tabId }: { playlistId: string; tabId: string }) => {
-      const response = await useApi('/playlists/{playlist_id}/tabs/{tab_id}/activate', 'post', {
+      const response = await apiRequest('/playlists/{playlist_id}/tabs/{tab_id}/activate', 'post', {
         path: {
           playlist_id: playlistId,
           tab_id: tabId,
@@ -12,14 +14,6 @@ const activateTab = () => {
       });
       return response.data;
     },
-  };
-};
-
-export const useActivateTab = () => {
-  const qc = useQueryClient();
-  
-  return useMutation({
-    ...activateTab(),
     onMutate: async ({ playlistId, tabId }: { playlistId: string; tabId: string }) => {
       // Only optimistically update the current tab and playlist from status API
       qc.setQueryData(['status'], (old: any) => {

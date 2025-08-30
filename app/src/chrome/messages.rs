@@ -22,6 +22,10 @@ pub enum ChromeMessage {
     UpdateTabUrl { tab_id: String, url: String },
     /// Close tab
     CloseTab { tab_id: String },
+    /// Refresh tab (reload page)
+    RefreshTab { tab_id: String },
+    /// Recreate tab (close and reopen)
+    RecreateTab { tab_id: String },
     /// Check Chrome status
     GetStatus,
     /// Shutdown Chrome controller
@@ -50,6 +54,7 @@ pub struct ChromeState {
     pub is_running: bool,
     pub auto_rotate: bool,
     pub current_tab_index: usize,
+    pub current_tab_opened_at: Option<std::time::SystemTime>,
 }
 
 impl Default for ChromeState {
@@ -60,6 +65,7 @@ impl Default for ChromeState {
             is_running: false,
             auto_rotate: false,
             current_tab_index: 0,
+            current_tab_opened_at: None,
         }
     }
 } 

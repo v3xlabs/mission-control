@@ -48,6 +48,8 @@ pub struct DeviceStatus {
     pub current_tab: Option<String>,
     /// Uptime in seconds
     pub uptime_seconds: u64,
+    /// When the current tab was opened (seconds since epoch, if available)
+    pub current_tab_opened_at: Option<u64>,
 }
 
 /// Authentication request

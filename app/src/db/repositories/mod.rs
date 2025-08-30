@@ -39,4 +39,6 @@ pub trait PlaylistTabRepository {
     async fn remove_tab_from_playlist(&self, playlist_id: &str, tab_id: &str) -> Result<bool>;
     async fn get_playlist_tabs(&self, playlist_id: &str) -> Result<Vec<TabWithOrder>>;
     async fn reorder_tabs(&self, playlist_id: &str, request: ReorderTabsRequest) -> Result<()>;
+    async fn toggle_tab_enabled(&self, playlist_id: &str, tab_id: &str, enabled: bool) -> Result<bool>;
+    async fn update_manual_activation(&self, playlist_id: &str, tab_id: &str) -> Result<()>;
 } 

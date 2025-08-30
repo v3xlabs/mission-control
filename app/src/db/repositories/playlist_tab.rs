@@ -42,13 +42,14 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
         
         // Insert or update the playlist-tab relationship
         sqlx::query(
-            "INSERT OR REPLACE INTO playlist_tabs (playlist_id, tab_id, order_index, duration_seconds) 
-             VALUES (?, ?, ?, ?)"
+            "INSERT OR REPLACE INTO playlist_tabs (playlist_id, tab_id, order_index, duration_seconds, enabled) 
+             VALUES (?, ?, ?, ?, ?)"
         )
         .bind(playlist_id)
         .bind(&request.tab_id)
         .bind(request.order_index)
         .bind(request.duration_seconds)
+        .bind(request.enabled.unwrap_or(true))
         .execute(&self.pool)
         .await?;
         
@@ -67,7 +68,9 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
     
     async fn get_playlist_tabs(&self, playlist_id: &str) -> Result<Vec<TabWithOrder>> {
         let rows = sqlx::query(
-            "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, pt.order_index, pt.duration_seconds, t.created_at, t.updated_at
+            "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, 
+                    pt.order_index, pt.duration_seconds, pt.enabled, pt.last_manual_activation,
+                    t.created_at, t.updated_at
              FROM tabs t
              JOIN playlist_tabs pt ON t.id = pt.tab_id
              WHERE pt.playlist_id = ?
@@ -88,6 +91,8 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
                 viewport_height: row.get("viewport_height"),
                 order_index: row.get("order_index"),
                 duration_seconds: row.get("duration_seconds"),
+                enabled: row.get("enabled"),
+                last_manual_activation: row.get("last_manual_activation"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             });
@@ -112,6 +117,31 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
         
         // Commit the transaction
         tx.commit().await?;
+        
+        Ok(())
+    }
+    
+    async fn toggle_tab_enabled(&self, playlist_id: &str, tab_id: &str, enabled: bool) -> Result<bool> {
+        let result = sqlx::query(
+            "UPDATE playlist_tabs SET enabled = ? WHERE playlist_id = ? AND tab_id = ?"
+        )
+        .bind(enabled)
+        .bind(playlist_id)
+        .bind(tab_id)
+        .execute(&self.pool)
+        .await?;
+        
+        Ok(result.rows_affected() > 0)
+    }
+    
+    async fn update_manual_activation(&self, playlist_id: &str, tab_id: &str) -> Result<()> {
+        sqlx::query(
+            "UPDATE playlist_tabs SET last_manual_activation = CURRENT_TIMESTAMP WHERE playlist_id = ? AND tab_id = ?"
+        )
+        .bind(playlist_id)
+        .bind(tab_id)
+        .execute(&self.pool)
+        .await?;
         
         Ok(())
     }

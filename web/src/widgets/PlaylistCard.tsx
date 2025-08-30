@@ -18,7 +18,7 @@ interface Props {
 
 export const PlaylistCard: FC<Props> = ({ playlist }) => {
   const activate = useActivatePlaylist();
-  const { currentPlaylist } = useCurrentPlaylist();
+  const { data: currentPlaylist } = useCurrentPlaylist();
   
   // Use only the current playlist from status API as the single source of truth
   const isActive = currentPlaylist === playlist.id;
@@ -37,7 +37,7 @@ export const PlaylistCard: FC<Props> = ({ playlist }) => {
         ) : (
           <button
             onClick={() => activate.mutate(playlist.id)}
-            className="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-700"
+            className="px-2 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600"
             disabled={activate.isPending}
           >
             {activate.isPending ? "Activating..." : "Activate"}

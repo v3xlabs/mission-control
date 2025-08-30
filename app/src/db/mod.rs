@@ -101,6 +101,13 @@ async fn run_migrations(pool: &SqlitePool) -> Result<()> {
     let _ = sqlx::query("ALTER TABLE tabs ADD COLUMN viewport_height INTEGER")
         .execute(pool).await; // Ignore errors if column already exists
     
+    // Add new fields to playlist_tabs table
+    let _ = sqlx::query("ALTER TABLE playlist_tabs ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE")
+        .execute(pool).await; // Ignore errors if column already exists
+        
+    let _ = sqlx::query("ALTER TABLE playlist_tabs ADD COLUMN last_manual_activation DATETIME")
+        .execute(pool).await; // Ignore errors if column already exists
+    
     Ok(())
 }
 
@@ -110,7 +117,7 @@ async fn seed_initial_data(pool: &SqlitePool) -> Result<()> {
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM playlists")
         .fetch_one(pool)
         .await?;
-    
+
     if count == 0 {
         info!("Database is empty, seeding initial data");
         
