@@ -1,5 +1,4 @@
 target/
 .env
-config.toml
 src/web/*
 sqlite.*

@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use poem_openapi::{payload::Json, OpenApi, OpenApiService};
 use crate::{
+    db::repositories::{PlaylistRepository, PlaylistTabRepository, TabRepository},
     state::AppState,
-    db::repositories::{PlaylistRepository, TabRepository, PlaylistTabRepository}
 };
-
+use poem_openapi::{payload::Json, OpenApi, OpenApiService};
 
 pub mod models;
 use models::*;
@@ -32,7 +31,10 @@ impl ManagementApi {
 
     /// Get all tabs from a given playlist.
     #[oai(path = "/playlists/:playlist_id/tabs", method = "get")]
-    async fn get_playlist_tabs(&self, playlist_id: poem_openapi::param::Path<String>) -> Json<Vec<TabInfo>> {
+    async fn get_playlist_tabs(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+    ) -> Json<Vec<TabInfo>> {
         let tabs = self
             .get_playlist_tabs_impl(&playlist_id.0)
             .await
@@ -60,13 +62,22 @@ impl ManagementApi {
 
     /// Activate a playlist
     #[oai(path = "/playlists/:playlist_id/activate", method = "post")]
-    async fn activate_playlist(&self, playlist_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+    async fn activate_playlist(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
         let pid = playlist_id.0.clone();
         tracing::info!("API: Activating playlist {}", pid);
-        
+
         // Send message to Chrome controller and wait for response
-        match crate::chrome::send_chrome_message_with_response(&self.state.chrome, 
-            crate::chrome::ChromeMessage::ActivatePlaylist { playlist_id: pid.clone() }).await {
+        match crate::chrome::send_chrome_message_with_response(
+            &self.state.chrome,
+            crate::chrome::ChromeMessage::ActivatePlaylist {
+                playlist_id: pid.clone(),
+            },
+        )
+        .await
+        {
             Ok(crate::chrome::ChromeResponse::Success) => {
                 tracing::info!("API: Successfully activated playlist {}", pid);
                 poem_openapi::payload::PlainText("ok".into())
@@ -76,7 +87,11 @@ impl ManagementApi {
                 poem_openapi::payload::PlainText(format!("Error activating playlist: {}", message))
             }
             Ok(response) => {
-                tracing::warn!("API: Unexpected response activating playlist {}: {:?}", pid, response);
+                tracing::warn!(
+                    "API: Unexpected response activating playlist {}: {:?}",
+                    pid,
+                    response
+                );
                 poem_openapi::payload::PlainText(format!("Unexpected response: {:?}", response))
             }
             Err(e) => {
@@ -87,20 +102,43 @@ impl ManagementApi {
     }
 
     /// Activate a tab immediately
-    #[oai(path = "/playlists/:playlist_id/tabs/:tab_id/activate", method = "post")]
-    async fn activate_tab(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+    #[oai(
+        path = "/playlists/:playlist_id/tabs/:tab_id/activate",
+        method = "post"
+    )]
+    async fn activate_tab(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+        tab_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
         let pid = playlist_id.0.clone();
         let tid = tab_id.0.clone();
         tracing::info!("API: Activating tab {} in playlist {}", tid, pid);
 
         // Update manual activation timestamp
-        if let Err(e) = self.state.playlist_tab_repository.update_manual_activation(&pid, &tid).await {
-            tracing::warn!("API: Failed to update manual activation timestamp for tab {}: {}", tid, e);
+        if let Err(e) = self
+            .state
+            .playlist_tab_repository
+            .update_manual_activation(&pid, &tid)
+            .await
+        {
+            tracing::warn!(
+                "API: Failed to update manual activation timestamp for tab {}: {}",
+                tid,
+                e
+            );
         }
 
         // Send message to Chrome controller to activate tab
-        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
-            crate::chrome::ChromeMessage::ActivateTab { tab_id: tid.clone(), playlist_id: pid.clone() }).await {
+        if let Err(e) = crate::chrome::send_chrome_message(
+            &self.state.chrome,
+            crate::chrome::ChromeMessage::ActivateTab {
+                tab_id: tid.clone(),
+                playlist_id: pid.clone(),
+            },
+        )
+        .await
+        {
             tracing::error!("API: Error activating tab {}: {}", tid, e);
             return poem_openapi::payload::PlainText(format!("Error activating tab: {}", e));
         }
@@ -111,7 +149,10 @@ impl ManagementApi {
 
     /// Create a new playlist
     #[oai(path = "/playlists", method = "post")]
-    async fn create_playlist(&self, request: Json<crate::db::models::CreatePlaylistRequest>) -> Json<PlaylistInfo> {
+    async fn create_playlist(
+        &self,
+        request: Json<crate::db::models::CreatePlaylistRequest>,
+    ) -> Json<PlaylistInfo> {
         match self.state.playlist_repository.create(request.0).await {
             Ok(playlist) => Json(PlaylistInfo {
                 id: playlist.id,
@@ -135,11 +176,25 @@ impl ManagementApi {
 
     /// Update an existing playlist
     #[oai(path = "/playlists/:playlist_id", method = "put")]
-    async fn update_playlist(&self, playlist_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::UpdatePlaylistRequest>) -> Json<PlaylistInfo> {
-        match self.state.playlist_repository.update(&playlist_id.0, request.0).await {
+    async fn update_playlist(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+        request: Json<crate::db::models::UpdatePlaylistRequest>,
+    ) -> Json<PlaylistInfo> {
+        match self
+            .state
+            .playlist_repository
+            .update(&playlist_id.0, request.0)
+            .await
+        {
             Ok(Some(playlist)) => {
                 // Get tab count
-                let tabs = self.state.playlist_tab_repository.get_playlist_tabs(&playlist.id).await.unwrap_or_default();
+                let tabs = self
+                    .state
+                    .playlist_tab_repository
+                    .get_playlist_tabs(&playlist.id)
+                    .await
+                    .unwrap_or_default();
                 Json(PlaylistInfo {
                     id: playlist.id,
                     name: playlist.name,
@@ -147,7 +202,7 @@ impl ManagementApi {
                     interval_seconds: playlist.interval_seconds,
                     is_active: playlist.is_active,
                 })
-            },
+            }
             Ok(None) => Json(PlaylistInfo {
                 id: "not_found".to_string(),
                 name: "Playlist not found".to_string(),
@@ -161,15 +216,20 @@ impl ManagementApi {
                 tab_count: 0,
                 interval_seconds: 30,
                 is_active: false,
-            })
+            }),
         }
     }
 
     /// Delete a playlist
     #[oai(path = "/playlists/:playlist_id", method = "delete")]
-    async fn delete_playlist(&self, playlist_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+    async fn delete_playlist(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
         match self.state.playlist_repository.delete(&playlist_id.0).await {
-            Ok(true) => poem_openapi::payload::PlainText("Playlist deleted successfully".to_string()),
+            Ok(true) => {
+                poem_openapi::payload::PlainText("Playlist deleted successfully".to_string())
+            }
             Ok(false) => poem_openapi::payload::PlainText("Playlist not found".to_string()),
             Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
         }
@@ -177,7 +237,10 @@ impl ManagementApi {
 
     /// Create a new tab
     #[oai(path = "/tabs", method = "post")]
-    async fn create_tab(&self, request: Json<crate::db::models::CreateTabRequest>) -> Json<TabInfo> {
+    async fn create_tab(
+        &self,
+        request: Json<crate::db::models::CreateTabRequest>,
+    ) -> Json<TabInfo> {
         match self.state.tab_repository.create(request.0).await {
             Ok(tab) => Json(TabInfo {
                 id: tab.id,
@@ -196,13 +259,17 @@ impl ManagementApi {
                 persist: false,
                 viewport_width: None,
                 viewport_height: None,
-            })
+            }),
         }
     }
 
     /// Update an existing tab
     #[oai(path = "/tabs/:tab_id", method = "put")]
-    async fn update_tab(&self, tab_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::UpdateTabRequest>) -> Json<TabInfo> {
+    async fn update_tab(
+        &self,
+        tab_id: poem_openapi::param::Path<String>,
+        request: Json<crate::db::models::UpdateTabRequest>,
+    ) -> Json<TabInfo> {
         match self.state.tab_repository.update(&tab_id.0, request.0).await {
             Ok(Some(tab)) => Json(TabInfo {
                 id: tab.id,
@@ -230,13 +297,16 @@ impl ManagementApi {
                 persist: false,
                 viewport_width: None,
                 viewport_height: None,
-            })
+            }),
         }
     }
 
     /// Delete a tab
     #[oai(path = "/tabs/:tab_id", method = "delete")]
-    async fn delete_tab(&self, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+    async fn delete_tab(
+        &self,
+        tab_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
         match self.state.tab_repository.delete(&tab_id.0).await {
             Ok(true) => poem_openapi::payload::PlainText("Tab deleted successfully".to_string()),
             Ok(false) => poem_openapi::payload::PlainText("Tab not found".to_string()),
@@ -246,18 +316,40 @@ impl ManagementApi {
 
     /// Add a tab to a playlist
     #[oai(path = "/playlists/:playlist_id/tabs", method = "post")]
-    async fn add_tab_to_playlist(&self, playlist_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::AddTabToPlaylistRequest>) -> poem_openapi::payload::PlainText<String> {
-        match self.state.playlist_tab_repository.add_tab_to_playlist(&playlist_id.0, request.0).await {
-            Ok(()) => poem_openapi::payload::PlainText("Tab added to playlist successfully".to_string()),
+    async fn add_tab_to_playlist(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+        request: Json<crate::db::models::AddTabToPlaylistRequest>,
+    ) -> poem_openapi::payload::PlainText<String> {
+        match self
+            .state
+            .playlist_tab_repository
+            .add_tab_to_playlist(&playlist_id.0, request.0)
+            .await
+        {
+            Ok(()) => {
+                poem_openapi::payload::PlainText("Tab added to playlist successfully".to_string())
+            }
             Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
         }
     }
 
     /// Remove a tab from a playlist
     #[oai(path = "/playlists/:playlist_id/tabs/:tab_id", method = "delete")]
-    async fn remove_tab_from_playlist(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
-        match self.state.playlist_tab_repository.remove_tab_from_playlist(&playlist_id.0, &tab_id.0).await {
-            Ok(true) => poem_openapi::payload::PlainText("Tab removed from playlist successfully".to_string()),
+    async fn remove_tab_from_playlist(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+        tab_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
+        match self
+            .state
+            .playlist_tab_repository
+            .remove_tab_from_playlist(&playlist_id.0, &tab_id.0)
+            .await
+        {
+            Ok(true) => poem_openapi::payload::PlainText(
+                "Tab removed from playlist successfully".to_string(),
+            ),
             Ok(false) => poem_openapi::payload::PlainText("Tab not found in playlist".to_string()),
             Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
         }
@@ -265,8 +357,17 @@ impl ManagementApi {
 
     /// Reorder tabs in a playlist
     #[oai(path = "/playlists/:playlist_id/reorder", method = "put")]
-    async fn reorder_tabs(&self, playlist_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::ReorderTabsRequest>) -> poem_openapi::payload::PlainText<String> {
-        match self.state.playlist_tab_repository.reorder_tabs(&playlist_id.0, request.0).await {
+    async fn reorder_tabs(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+        request: Json<crate::db::models::ReorderTabsRequest>,
+    ) -> poem_openapi::payload::PlainText<String> {
+        match self
+            .state
+            .playlist_tab_repository
+            .reorder_tabs(&playlist_id.0, request.0)
+            .await
+        {
             Ok(()) => poem_openapi::payload::PlainText("Tabs reordered successfully".to_string()),
             Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
         }
@@ -274,13 +375,22 @@ impl ManagementApi {
 
     /// Refresh a tab (reload page)
     #[oai(path = "/tabs/:tab_id/refresh", method = "post")]
-    async fn refresh_tab(&self, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+    async fn refresh_tab(
+        &self,
+        tab_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
         let tid = tab_id.0.clone();
         tracing::info!("API: Refreshing tab {}", tid);
 
         // Send message to Chrome controller to refresh tab
-        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
-            crate::chrome::ChromeMessage::RefreshTab { tab_id: tid.clone() }).await {
+        if let Err(e) = crate::chrome::send_chrome_message(
+            &self.state.chrome,
+            crate::chrome::ChromeMessage::RefreshTab {
+                tab_id: tid.clone(),
+            },
+        )
+        .await
+        {
             tracing::error!("API: Error refreshing tab {}: {}", tid, e);
             return poem_openapi::payload::PlainText(format!("Error refreshing tab: {}", e));
         }
@@ -291,13 +401,22 @@ impl ManagementApi {
 
     /// Recreate a tab (close and reopen)
     #[oai(path = "/tabs/:tab_id/recreate", method = "post")]
-    async fn recreate_tab(&self, tab_id: poem_openapi::param::Path<String>) -> poem_openapi::payload::PlainText<String> {
+    async fn recreate_tab(
+        &self,
+        tab_id: poem_openapi::param::Path<String>,
+    ) -> poem_openapi::payload::PlainText<String> {
         let tid = tab_id.0.clone();
         tracing::info!("API: Recreating tab {}", tid);
 
         // Send message to Chrome controller to recreate tab
-        if let Err(e) = crate::chrome::send_chrome_message(&self.state.chrome, 
-            crate::chrome::ChromeMessage::RecreateTab { tab_id: tid.clone() }).await {
+        if let Err(e) = crate::chrome::send_chrome_message(
+            &self.state.chrome,
+            crate::chrome::ChromeMessage::RecreateTab {
+                tab_id: tid.clone(),
+            },
+        )
+        .await
+        {
             tracing::error!("API: Error recreating tab {}: {}", tid, e);
             return poem_openapi::payload::PlainText(format!("Error recreating tab: {}", e));
         }
@@ -308,9 +427,27 @@ impl ManagementApi {
 
     /// Toggle tab enabled state in playlist
     #[oai(path = "/playlists/:playlist_id/tabs/:tab_id/toggle", method = "put")]
-    async fn toggle_tab_enabled(&self, playlist_id: poem_openapi::param::Path<String>, tab_id: poem_openapi::param::Path<String>, request: Json<crate::db::models::ToggleTabEnabledRequest>) -> poem_openapi::payload::PlainText<String> {
-        match self.state.playlist_tab_repository.toggle_tab_enabled(&playlist_id.0, &tab_id.0, request.enabled).await {
-            Ok(true) => poem_openapi::payload::PlainText(format!("Tab {} in playlist {}", if request.enabled { "enabled" } else { "disabled" }, "successfully")),
+    async fn toggle_tab_enabled(
+        &self,
+        playlist_id: poem_openapi::param::Path<String>,
+        tab_id: poem_openapi::param::Path<String>,
+        request: Json<crate::db::models::ToggleTabEnabledRequest>,
+    ) -> poem_openapi::payload::PlainText<String> {
+        match self
+            .state
+            .playlist_tab_repository
+            .toggle_tab_enabled(&playlist_id.0, &tab_id.0, request.enabled)
+            .await
+        {
+            Ok(true) => poem_openapi::payload::PlainText(format!(
+                "Tab {} in playlist {}",
+                if request.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                "successfully"
+            )),
             Ok(false) => poem_openapi::payload::PlainText("Tab not found in playlist".to_string()),
             Err(e) => poem_openapi::payload::PlainText(format!("Error: {}", e)),
         }
@@ -320,7 +457,7 @@ impl ManagementApi {
 impl ManagementApi {
     async fn get_playlists_impl(&self) -> anyhow::Result<Vec<PlaylistInfo>> {
         let playlists_with_tabs = self.state.playlist_repository.get_all_with_tabs().await?;
-        
+
         let mut playlists = Vec::new();
         for playlist in playlists_with_tabs {
             playlists.push(PlaylistInfo {
@@ -339,8 +476,12 @@ impl ManagementApi {
         &self,
         playlist_id: &str,
     ) -> anyhow::Result<Option<Vec<TabInfo>>> {
-        let tabs_with_order = self.state.playlist_tab_repository.get_playlist_tabs(playlist_id).await?;
-        
+        let tabs_with_order = self
+            .state
+            .playlist_tab_repository
+            .get_playlist_tabs(playlist_id)
+            .await?;
+
         let mut tabs = Vec::new();
         for tab in tabs_with_order {
             tabs.push(TabInfo {
@@ -361,13 +502,18 @@ impl ManagementApi {
         let chrome_state = self.state.chrome.state.lock().await;
         let current_playlist = chrome_state.current_playlist_id.clone();
         let current_tab = chrome_state.current_tab_id.clone();
-        let current_tab_opened_at = chrome_state.current_tab_opened_at
+        let current_tab_opened_at = chrome_state
+            .current_tab_opened_at
             .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|duration| duration.as_secs());
 
         // Log state for debugging
-        tracing::info!("Chrome state - playlist: {:?}, tab: {:?}, running: {}", 
-            current_playlist, current_tab, chrome_state.is_running);
+        tracing::info!(
+            "Chrome state - playlist: {:?}, tab: {:?}, running: {}",
+            current_playlist,
+            current_tab,
+            chrome_state.is_running
+        );
 
         Ok(DeviceStatus {
             device_id: self.state.config.device.id.clone(),
@@ -382,10 +528,5 @@ impl ManagementApi {
 
 /// Helper to create an `OpenApiService` from the management API
 pub fn create_api_service(state: Arc<AppState>) -> OpenApiService<ManagementApi, ()> {
-    OpenApiService::new(
-        ManagementApi::new(state),
-        "Mission Control API",
-        "0.1.0",
-    )
-    .server("/")
-} 
+    OpenApiService::new(ManagementApi::new(state), "Mission Control API", "0.1.0").server("/")
+}

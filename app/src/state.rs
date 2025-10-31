@@ -1,17 +1,16 @@
-use std::sync::Arc;
 use sqlx::SqlitePool;
+use std::sync::Arc;
 
 use rumqttc::Connection;
 
 use crate::{
-    chrome::ChromeController, 
-    config::Config, 
-    models::hass::HassManager,
+    chrome::ChromeController,
+    config::Config,
     db::repositories::{
-        playlist::SqlitePlaylistRepository,
+        playlist::SqlitePlaylistRepository, playlist_tab::SqlitePlaylistTabRepository,
         tab::SqliteTabRepository,
-        playlist_tab::SqlitePlaylistTabRepository,
-    }
+    },
+    models::hass::HassManager,
 };
 
 pub type State = Arc<AppState>;

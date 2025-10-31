@@ -1,9 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use sqlx::{SqlitePool, Row};
+use sqlx::{Row, SqlitePool};
 
-use crate::db::models::*;
 use super::PlaylistTabRepository;
+use crate::db::models::*;
 
 pub struct SqlitePlaylistTabRepository {
     pool: SqlitePool,
@@ -17,29 +17,39 @@ impl SqlitePlaylistTabRepository {
 
 #[async_trait]
 impl PlaylistTabRepository for SqlitePlaylistTabRepository {
-    async fn add_tab_to_playlist(&self, playlist_id: &str, request: AddTabToPlaylistRequest) -> Result<()> {
+    async fn add_tab_to_playlist(
+        &self,
+        playlist_id: &str,
+        request: AddTabToPlaylistRequest,
+    ) -> Result<()> {
         // First check if the tab exists
         let tab_count: i64 = sqlx::query("SELECT COUNT(*) FROM tabs WHERE id = ?")
             .bind(&request.tab_id)
             .fetch_one(&self.pool)
             .await?
             .get(0);
-        
+
         if tab_count == 0 {
-            return Err(anyhow::anyhow!("Tab with id '{}' does not exist", request.tab_id));
+            return Err(anyhow::anyhow!(
+                "Tab with id '{}' does not exist",
+                request.tab_id
+            ));
         }
-        
+
         // Check if the playlist exists
         let playlist_count: i64 = sqlx::query("SELECT COUNT(*) FROM playlists WHERE id = ?")
             .bind(playlist_id)
             .fetch_one(&self.pool)
             .await?
             .get(0);
-        
+
         if playlist_count == 0 {
-            return Err(anyhow::anyhow!("Playlist with id '{}' does not exist", playlist_id));
+            return Err(anyhow::anyhow!(
+                "Playlist with id '{}' does not exist",
+                playlist_id
+            ));
         }
-        
+
         // Insert or update the playlist-tab relationship
         sqlx::query(
             "INSERT OR REPLACE INTO playlist_tabs (playlist_id, tab_id, order_index, duration_seconds, enabled) 
@@ -52,20 +62,20 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
         .bind(request.enabled.unwrap_or(true))
         .execute(&self.pool)
         .await?;
-        
+
         Ok(())
     }
-    
+
     async fn remove_tab_from_playlist(&self, playlist_id: &str, tab_id: &str) -> Result<bool> {
         let result = sqlx::query("DELETE FROM playlist_tabs WHERE playlist_id = ? AND tab_id = ?")
             .bind(playlist_id)
             .bind(tab_id)
             .execute(&self.pool)
             .await?;
-        
+
         Ok(result.rows_affected() > 0)
     }
-    
+
     async fn get_playlist_tabs(&self, playlist_id: &str) -> Result<Vec<TabWithOrder>> {
         let rows = sqlx::query(
             "SELECT t.id, t.name, t.url, t.persist, t.viewport_width, t.viewport_height, 
@@ -74,12 +84,12 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
              FROM tabs t
              JOIN playlist_tabs pt ON t.id = pt.tab_id
              WHERE pt.playlist_id = ?
-             ORDER BY pt.order_index"
+             ORDER BY pt.order_index",
         )
         .bind(playlist_id)
         .fetch_all(&self.pool)
         .await?;
-        
+
         let mut tabs = Vec::new();
         for row in rows {
             tabs.push(TabWithOrder {
@@ -97,43 +107,50 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
                 updated_at: row.get("updated_at"),
             });
         }
-        
+
         Ok(tabs)
     }
-    
+
     async fn reorder_tabs(&self, playlist_id: &str, request: ReorderTabsRequest) -> Result<()> {
         // Start a transaction
         let mut tx = self.pool.begin().await?;
-        
+
         // Update the order for each tab
         for tab_order in request.tab_orders {
-            sqlx::query("UPDATE playlist_tabs SET order_index = ? WHERE playlist_id = ? AND tab_id = ?")
-                .bind(tab_order.order_index)
-                .bind(playlist_id)
-                .bind(tab_order.tab_id)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query(
+                "UPDATE playlist_tabs SET order_index = ? WHERE playlist_id = ? AND tab_id = ?",
+            )
+            .bind(tab_order.order_index)
+            .bind(playlist_id)
+            .bind(tab_order.tab_id)
+            .execute(&mut *tx)
+            .await?;
         }
-        
+
         // Commit the transaction
         tx.commit().await?;
-        
+
         Ok(())
     }
-    
-    async fn toggle_tab_enabled(&self, playlist_id: &str, tab_id: &str, enabled: bool) -> Result<bool> {
+
+    async fn toggle_tab_enabled(
+        &self,
+        playlist_id: &str,
+        tab_id: &str,
+        enabled: bool,
+    ) -> Result<bool> {
         let result = sqlx::query(
-            "UPDATE playlist_tabs SET enabled = ? WHERE playlist_id = ? AND tab_id = ?"
+            "UPDATE playlist_tabs SET enabled = ? WHERE playlist_id = ? AND tab_id = ?",
         )
         .bind(enabled)
         .bind(playlist_id)
         .bind(tab_id)
         .execute(&self.pool)
         .await?;
-        
+
         Ok(result.rows_affected() > 0)
     }
-    
+
     async fn update_manual_activation(&self, playlist_id: &str, tab_id: &str) -> Result<()> {
         sqlx::query(
             "UPDATE playlist_tabs SET last_manual_activation = CURRENT_TIMESTAMP WHERE playlist_id = ? AND tab_id = ?"
@@ -142,7 +159,7 @@ impl PlaylistTabRepository for SqlitePlaylistTabRepository {
         .bind(tab_id)
         .execute(&self.pool)
         .await?;
-        
+
         Ok(())
     }
-} 
+}

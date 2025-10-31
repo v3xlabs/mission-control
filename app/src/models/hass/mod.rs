@@ -1,11 +1,17 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::{config::Config, state::AppState};
+use crate::{
+    chrome::{send_chrome_message, ChromeMessage},
+    config::Config,
+    db::models::TabWithOrder,
+    display,
+    state::{AppState, State},
+};
 use entity::HassEntity;
 
 use reqwest::Url;
 use rumqttc::{Client, Connection, Event, LastWill, MqttOptions, Packet, QoS};
-use tracing::info;
+use tracing::{info, warn};
 
 pub mod entity;
 
@@ -27,20 +33,57 @@ impl HassManager {
         let mut mqttoptions = MqttOptions::new("disabled", "localhost", 1883);
         mqttoptions.set_keep_alive(Duration::from_secs(60));
         let (mqtt_client, _) = Client::new(mqttoptions, 10);
-        
+
         Self {
             mqtt_client,
             availability_topic: String::new(),
-            brightness_entity: HassEntity::new_brightness(String::new(), String::new(), String::new(), None),
-            backlight_entity: HassEntity::new_backlight(String::new(), String::new(), String::new(), None),
-            playlist_entity: HassEntity::new_playlist(String::new(), String::new(), String::new(), None, None),
+            brightness_entity: HassEntity::new_brightness(
+                String::new(),
+                String::new(),
+                String::new(),
+                None,
+            ),
+            backlight_entity: HassEntity::new_backlight(
+                String::new(),
+                String::new(),
+                String::new(),
+                None,
+            ),
+            playlist_entity: HassEntity::new_playlist(
+                String::new(),
+                String::new(),
+                String::new(),
+                None,
+                None,
+            ),
             tab_entity: HassEntity::new_tab(String::new(), String::new(), String::new()),
             url_entity: HassEntity::new_url(String::new(), String::new(), String::new()),
         }
     }
 
+    pub fn publish_playlist_options(&self, playlists: Vec<String>, active_playlist: Option<&str>) {
+        let mut entity = self.playlist_entity.clone();
+        entity.options = Some(playlists);
+        entity.publish_config(&self.mqtt_client);
+        if let Some(active) = active_playlist {
+            entity.update_state(&self.mqtt_client, active);
+        }
+    }
+
+    pub fn publish_tab_options(&self, tabs: &[TabWithOrder], active_tab: Option<&str>) {
+        let mut entity = self.tab_entity.clone();
+        entity.options = Some(tabs.iter().map(|t| t.id.clone()).collect());
+        entity.publish_config(&self.mqtt_client);
+        if let Some(active) = active_tab {
+            entity.update_state(&self.mqtt_client, active);
+        }
+    }
+
     pub async fn new(config: &Config) -> (Self, Connection) {
-        let hass_config = config.homeassistant.as_ref().expect("HomeAssistant config required");
+        let hass_config = config
+            .homeassistant
+            .as_ref()
+            .expect("HomeAssistant config required");
         let mqtt_url = hass_config.mqtt.url.parse::<Url>().unwrap();
         let mqtt_port = mqtt_url.port().unwrap_or(1883);
 
@@ -80,39 +123,14 @@ impl HassManager {
             config.device.name.to_string(),
             config.device.id.to_string(),
             availability_topic.to_string(),
-            Some(|_state, new_state| {
-                info!("Brightness state changed: {}", new_state);
-            }),
+            Some(handle_brightness_change),
         );
 
         let backlight_entity = HassEntity::new_backlight(
             config.device.name.to_string(),
             config.device.id.to_string(),
             availability_topic.to_string(),
-            Some(|state, new_state| {
-                info!("Backlight state changed: {}", new_state);
-
-                if let Some(_xrandr) = &state.config.display.xrandr {
-                    if new_state.eq("ON") {
-                        let xrandr_command =
-                            "xset dpms force on && xset s off && xset -dpms".to_string();
-                        let xrandr_result = std::process::Command::new("sh")
-                            .arg("-c")
-                            .arg(xrandr_command)
-                            .output()
-                            .expect("Failed to execute xrandr command");
-                        info!("xrandr result: {:?}", xrandr_result);
-                    } else {
-                        let xrandr_command = "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off".to_string();
-                        let xrandr_result = std::process::Command::new("sh")
-                            .arg("-c")
-                            .arg(xrandr_command)
-                            .output()
-                            .expect("Failed to execute xrandr command");
-                        info!("xrandr result: {:?}", xrandr_result);
-                    }
-                }
-            }),
+            Some(handle_backlight_change),
         );
 
         let playlist_options = config.chromium.as_ref().map(|chromium| {
@@ -171,7 +189,7 @@ impl HassManager {
         if self.availability_topic.is_empty() {
             return;
         }
-        
+
         self.mqtt_client
             .publish(&self.availability_topic, QoS::AtLeastOnce, true, "online")
             .unwrap();
@@ -226,10 +244,36 @@ impl HassManager {
                                     state,
                                     &publish.payload,
                                 );
-                                let payload =
-                                    String::from_utf8_lossy(&publish.payload).to_string();
-                                let _ = crate::chrome::send_chrome_message(&state.chrome, 
-                                    crate::chrome::ChromeMessage::ActivatePlaylist { playlist_id: payload }).await;
+                                let payload = String::from_utf8_lossy(&publish.payload).to_string();
+                                let _ = crate::chrome::send_chrome_message(
+                                    &state.chrome,
+                                    crate::chrome::ChromeMessage::ActivatePlaylist {
+                                        playlist_id: payload,
+                                    },
+                                )
+                                .await;
+                            }
+
+                            if publish.topic.eq(&self.tab_entity.command_topic) {
+                                info!("Command received: {:?}", &publish.payload);
+                                self.tab_entity.handle_command(
+                                    &self.mqtt_client,
+                                    state,
+                                    &publish.payload,
+                                );
+                                let payload = String::from_utf8_lossy(&publish.payload).to_string();
+                                if let Some(active_playlist) =
+                                    state.chrome.state.lock().await.current_playlist_id.clone()
+                                {
+                                    let _ = send_chrome_message(
+                                        &state.chrome,
+                                        ChromeMessage::ActivateTab {
+                                            tab_id: payload,
+                                            playlist_id: active_playlist,
+                                        },
+                                    )
+                                    .await;
+                                }
                             }
                         }
                     }
@@ -246,4 +290,39 @@ impl HassManager {
             }
         }
     }
+}
+
+fn handle_backlight_change(state: &State, new_state: &str) {
+    info!("Backlight state changed: {}", new_state);
+
+    let output = state.config.display.output.as_deref();
+    let turn_on = new_state.eq_ignore_ascii_case("ON");
+
+    if let Err(err) = display::set_dpms(turn_on, output) {
+        warn!("Failed to set DPMS via swaymsg/wlr-randr: {}", err);
+    }
+
+    state
+        .hass
+        .backlight_entity
+        .update_state(&state.hass.mqtt_client, new_state);
+}
+
+fn handle_brightness_change(state: &State, new_state: &str) {
+    info!("Brightness state changed: {}", new_state);
+
+    let Ok(value) = new_state.parse::<f32>() else {
+        warn!("Brightness payload not a number: {}", new_state);
+        return;
+    };
+
+    let display_target = state.config.display.ddcutil_display.as_deref();
+    if let Err(err) = display::set_ddc_brightness(display_target, value) {
+        warn!("Failed to set brightness via ddcutil: {}", err);
+    }
+
+    state
+        .hass
+        .brightness_entity
+        .update_state(&state.hass.mqtt_client, new_state);
 }

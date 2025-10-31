@@ -11,7 +11,10 @@ pub enum ChromeMessage {
     /// Start automatic playlist rotation
     StartPlaylist,
     /// Update playlist interval
-    UpdateInterval { playlist_id: String, interval_seconds: i64 },
+    UpdateInterval {
+        playlist_id: String,
+        interval_seconds: i64,
+    },
     /// Reload current tab
     ReloadTab,
     /// Navigate to next tab in playlist
@@ -47,8 +50,7 @@ pub enum ChromeResponse {
     },
 }
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ChromeState {
     pub current_playlist_id: Option<String>,
     pub current_tab_id: Option<String>,
@@ -57,5 +59,3 @@ pub struct ChromeState {
     pub current_tab_index: usize,
     pub current_tab_opened_at: Option<std::time::SystemTime>,
 }
-
- 

@@ -1,8 +1,8 @@
-use tracing::info;
 use bytes::Bytes;
 use rumqttc::{Client, QoS};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::info;
 
 use crate::state::State;
 
@@ -319,9 +319,13 @@ impl HassEntity {
         if self.state_topic.is_empty() {
             return;
         }
-        
-        if let Err(e) = client.publish(&self.state_topic, QoS::AtLeastOnce, true, state.to_string()) {
-            eprintln!("Failed to publish MQTT message to {}: {}", self.state_topic, e);
+
+        if let Err(e) = client.publish(&self.state_topic, QoS::AtLeastOnce, true, state.to_string())
+        {
+            eprintln!(
+                "Failed to publish MQTT message to {}: {}",
+                self.state_topic, e
+            );
         }
     }
 

@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use figment::{providers::{Format, Toml}, Figment};
+use figment::{
+    providers::{Format, Toml},
+    Figment,
+};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +36,14 @@ pub struct DeviceConfig {
 #[derive(Debug, Deserialize)]
 pub struct DisplayConfig {
     pub sleep_time: Option<u32>,
+    #[serde(default)]
     pub xrandr: Option<String>,
+    /// Wayland output name for swaymsg/wlr-randr (default '*')
+    #[serde(default)]
+    pub output: Option<String>,
+    /// Optional ddcutil display selector (e.g., display number)
+    #[serde(default)]
+    pub ddcutil_display: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -56,6 +66,8 @@ pub struct ChromiumTabConfig {
 pub struct ChromiumPlaylistConfig {
     pub tabs: Vec<String>,
     pub interval: u32,
+    #[serde(default)]
+    pub is_active: bool,
 }
 
 pub fn load_config() -> Result<Config> {

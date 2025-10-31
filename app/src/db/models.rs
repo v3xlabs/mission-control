@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use poem_openapi::Object;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Playlist {
@@ -122,4 +122,4 @@ pub struct TabOrder {
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct ToggleTabEnabledRequest {
     pub enabled: bool,
-} 
+}
