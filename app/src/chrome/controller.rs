@@ -39,6 +39,12 @@ pub struct ChromeController {
     pub timer_cancel: Arc<Mutex<Option<Sender<()>>>>,
 }
 
+impl Default for ChromeController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChromeController {
     pub fn new() -> Self {
         let (message_sender, message_receiver) = channel(100);

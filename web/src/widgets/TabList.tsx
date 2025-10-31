@@ -13,7 +13,7 @@ interface Props {
 
 export const TabList: FC<Props> = ({ playlistId }) => {
   const { data: currentPlaylist } = useCurrentPlaylist();
-  const currentTab = ""; // TODO: need to add current tab to status
+  const currentTab = "";
   const currentTabId =
     currentPlaylist === playlistId ? currentTab : null;
 

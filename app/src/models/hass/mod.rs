@@ -95,7 +95,7 @@ impl HassManager {
                 if let Some(_xrandr) = &state.config.display.xrandr {
                     if new_state.eq("ON") {
                         let xrandr_command =
-                            format!("xset dpms force on && xset s off && xset -dpms",);
+                            "xset dpms force on && xset s off && xset -dpms".to_string();
                         let xrandr_result = std::process::Command::new("sh")
                             .arg("-c")
                             .arg(xrandr_command)
@@ -103,9 +103,7 @@ impl HassManager {
                             .expect("Failed to execute xrandr command");
                         info!("xrandr result: {:?}", xrandr_result);
                     } else {
-                        let xrandr_command = format!(
-                            "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off",
-                        );
+                        let xrandr_command = "xset s off && xset +dpms && xset dpms 600 600 600 && xset dpms force off".to_string();
                         let xrandr_result = std::process::Command::new("sh")
                             .arg("-c")
                             .arg(xrandr_command)
@@ -194,7 +192,7 @@ impl HassManager {
     pub async fn run(&self, connection: &mut Connection, state: &Arc<AppState>) {
         let mut _error_count = 0;
 
-        for (_i, notification) in connection.iter().enumerate() {
+        for notification in connection.iter() {
             info!("Notification: {:?}", notification);
 
             match notification {
@@ -207,7 +205,7 @@ impl HassManager {
                                 info!("Command received: {:?}", &publish.payload);
                                 self.brightness_entity.handle_command(
                                     &self.mqtt_client,
-                                    &state,
+                                    state,
                                     &publish.payload,
                                 );
                             }
@@ -216,7 +214,7 @@ impl HassManager {
                                 info!("Command received: {:?}", &publish.payload);
                                 self.backlight_entity.handle_command(
                                     &self.mqtt_client,
-                                    &state,
+                                    state,
                                     &publish.payload,
                                 );
                             }
@@ -225,7 +223,7 @@ impl HassManager {
                                 info!("Command received: {:?}", &publish.payload);
                                 self.playlist_entity.handle_command(
                                     &self.mqtt_client,
-                                    &state,
+                                    state,
                                     &publish.payload,
                                 );
                                 let payload =

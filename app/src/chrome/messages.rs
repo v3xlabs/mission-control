@@ -48,6 +48,7 @@ pub enum ChromeResponse {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ChromeState {
     pub current_playlist_id: Option<String>,
     pub current_tab_id: Option<String>,
@@ -57,15 +58,4 @@ pub struct ChromeState {
     pub current_tab_opened_at: Option<std::time::SystemTime>,
 }
 
-impl Default for ChromeState {
-    fn default() -> Self {
-        Self {
-            current_playlist_id: None,
-            current_tab_id: None,
-            is_running: false,
-            auto_rotate: false,
-            current_tab_index: 0,
-            current_tab_opened_at: None,
-        }
-    }
-} 
+ 

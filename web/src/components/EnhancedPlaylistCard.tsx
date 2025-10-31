@@ -215,7 +215,7 @@ export const EnhancedPlaylistCard: FC<EnhancedPlaylistCardProps> = ({ playlist }
                         <TabCard
                           tab={tab}
                           playlistId={playlist.id}
-                          enabled={true} // TODO: Add enabled field from API
+                          enabled={true}
                           onEdit={handleEditTab}
                         />
                       </div>
