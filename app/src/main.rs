@@ -9,6 +9,7 @@ pub mod api;
 pub mod chrome;
 pub mod config;
 pub mod db;
+pub mod display;
 pub mod http;
 pub mod models;
 pub mod state;
@@ -18,13 +19,20 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     info!("Hello, world!");
 
-    let config = config::load_config()?;
+    let config = match config::load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to load config.toml: {e}");
+            eprintln!("Ensure config has [device] name/id and [chromium] sections as needed.");
+            return Err(e);
+        }
+    };
 
     info!("Config: {:?}", config);
 
     // Initialize database
     let db_pool = db::init_database().await?;
-    
+
     // Import config data if chromium config exists
     if let Some(ref chromium_config) = config.chromium {
         db::import_config_data(&db_pool, chromium_config).await?;
@@ -39,8 +47,15 @@ async fn main() -> Result<()> {
             let state_clone = state.clone();
 
             task::spawn(async move {
-                if let Err(e) = state_clone.chrome.start(&chromium_config_clone, &state_clone).await {
+                tracing::info!("Attempting to start Chrome controller...");
+                if let Err(e) = state_clone
+                    .chrome
+                    .start(&chromium_config_clone, &state_clone)
+                    .await
+                {
                     tracing::error!("Failed to start Chrome controller: {}", e);
+                } else {
+                    tracing::info!("Chrome controller started successfully.");
                 }
             });
         }

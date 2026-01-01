@@ -68,4 +68,4 @@ pub struct AuthResponse {
     pub token: Option<String>,
     /// Error message (if failed)
     pub message: Option<String>,
-} 
+}

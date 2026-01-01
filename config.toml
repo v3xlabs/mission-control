@@ -1,0 +1,20 @@
+[device]
+name = "My Mission Control Device"
+id = "my-mission-control-device"
+
+[display]
+sleep_time = 600
+
+[chromium]
+enabled = true
+binary_path = "/usr/bin/chromium"
+theme = "dark"
+
+[chromium.tabs.welcome_page]
+url = "data:text/html,<h1>Welcome to Mission Control</h1><p>Chrome controller is working!</p>"
+persist = true
+
+[chromium.playlists.default_playlist]
+tabs = ["welcome_page"]
+interval = 30
+is_active = true

@@ -1,9 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
-use tracing::info;
 use anyhow::Result;
 use base64::Engine;
-use rust_embed::RustEmbed;
 use poem::{
     endpoint::EmbeddedFilesEndpoint,
     get, handler,
@@ -14,6 +12,8 @@ use poem::{
     Body, EndpointExt as _, IntoResponse, Response, Route, Server,
 };
 use poem_openapi::OpenApiService;
+use rust_embed::RustEmbed;
+use tracing::info;
 
 use crate::{api, state::AppState};
 
@@ -25,13 +25,17 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
     info!("Starting HTTP server on port 3000");
 
     // Create OpenAPI service and Swagger UI
-    let api_service: OpenApiService<api::ManagementApi, ()> = api::create_api_service(state.clone());
+    let api_service: OpenApiService<api::ManagementApi, ()> =
+        api::create_api_service(state.clone());
     let ui = api_service.swagger_ui();
     let spec = api_service.spec_endpoint();
 
     let app = Route::new()
         .at("/api/preview/:tab_id", get(preview).data(state.clone()))
-        .at("/api/preview_live/:tab_id", get(preview_live).data(state.clone()))
+        .at(
+            "/api/preview_live/:tab_id",
+            get(preview_live).data(state.clone()),
+        )
         .nest("/api", api_service)
         .nest("/docs", ui)
         .at("/docs/spec", spec)
@@ -44,7 +48,6 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
     Ok(())
 }
 
-
 #[handler]
 async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl IntoResponse {
     info!("preview: {}", tab_id.0);
@@ -52,7 +55,7 @@ async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl Into
     let last_frames = state.chrome.last_frame.lock().await;
     let available_tabs: Vec<String> = last_frames.keys().cloned().collect();
     info!("Available tabs with frames: {:?}", available_tabs);
-    
+
     let body = match last_frames.get(&tab_id.0) {
         Some(body) => body,
         None => {
@@ -76,7 +79,11 @@ async fn preview(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl Into
         }
     };
 
-    info!("Successfully decoded image for tab_id {}: {} bytes", tab_id.0, body.len());
+    info!(
+        "Successfully decoded image for tab_id {}: {} bytes",
+        tab_id.0,
+        body.len()
+    );
 
     Response::builder()
         .body(Body::from_bytes(body.clone().into()))
