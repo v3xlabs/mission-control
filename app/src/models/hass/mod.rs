@@ -281,6 +281,7 @@ impl HassManager {
                 Err(e) => {
                     _error_count += 1;
                     info!("Error: {:?}", e);
+                    std::thread::sleep(Duration::from_secs(2));
 
                     // if error_count > 10 {
                     // info!("Too many errors, exiting");

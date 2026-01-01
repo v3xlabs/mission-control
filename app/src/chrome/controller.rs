@@ -8,8 +8,8 @@ use anyhow::{anyhow, Result};
 use async_std::{sync::Mutex, task};
 use chromiumoxide::{
     cdp::browser_protocol::page::{
-        EventScreencastFrame, NavigateParams, ScreencastFrameAckParams, StartScreencastFormat,
-        StartScreencastParams,
+        AddScriptToEvaluateOnNewDocumentParams, EventScreencastFrame, NavigateParams,
+        ScreencastFrameAckParams, StartScreencastFormat, StartScreencastParams,
     },
     Browser, BrowserConfig, Page,
 };
@@ -98,12 +98,39 @@ impl ChromeController {
                     .unwrap_or_else(|| "chromium".to_string()),
             )
             .with_head()
-            .arg("--no-sandbox")
+            .disable_default_args()
+            // baseline defaults from chromiumoxide minus --enable-automation
+            .arg("--disable-background-networking")
+            .arg("--enable-features=NetworkService,NetworkServiceInProcess")
+            .arg("--disable-background-timer-throttling")
+            .arg("--disable-backgrounding-occluded-windows")
+            .arg("--disable-breakpad")
+            .arg("--disable-client-side-phishing-detection")
+            .arg("--disable-component-extensions-with-background-pages")
+            .arg("--disable-default-apps")
             .arg("--disable-dev-shm-usage")
+            .arg("--disable-extensions")
+            .arg("--disable-features=TranslateUI")
+            .arg("--disable-hang-monitor")
+            .arg("--disable-ipc-flooding-protection")
+            .arg("--disable-popup-blocking")
+            .arg("--disable-prompt-on-repost")
+            .arg("--disable-renderer-backgrounding")
+            .arg("--disable-sync")
+            .arg("--force-color-profile=srgb")
+            .arg("--metrics-recording-only")
+            .arg("--no-first-run")
+            .arg("--password-store=basic")
+            .arg("--use-mock-keychain")
+            .arg("--enable-blink-features=IdleDetection")
+            .arg("--lang=en_US")
+            // kiosk/automation-hiding
+            .arg("--no-sandbox")
             .arg("--disable-gpu")
             .arg("--kiosk")
-            .arg("--no-first-run")
             .arg("--disable-infobars")
+            .arg("--disable-automation")
+            .arg("--disable-blink-features=AutomationControlled")
             .arg("--disable-session-crashed-bubble")
             .viewport(None)
             .build()
@@ -392,6 +419,17 @@ impl ChromeController {
             b.clone().ok_or_else(|| anyhow!("Browser not ready"))?
         };
         let page = browser.new_page(url).await?;
+        // Suppress automation banner / webdriver detection
+        let _ = page
+            .execute(
+                AddScriptToEvaluateOnNewDocumentParams::builder()
+                    .source(
+                        "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });",
+                    )
+                    .build()
+                    .unwrap(),
+            )
+            .await;
         let page_arc = Arc::new(page);
         self.pages
             .lock()
