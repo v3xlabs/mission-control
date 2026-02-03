@@ -28,7 +28,7 @@ rumqttc = "0.24.0"
 chromiumoxide = "0.7.0"
 base64 = "0.22.1"
 async-stream = "0.3.6"
-bytes = { version = "1.10.0", features = ["serde"] }
+bytes = { version = "1.11.1", features = ["serde"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["serde"] }
 poem-openapi = { version = "5.1.15", features = ["static-files", "swagger-ui"] }
