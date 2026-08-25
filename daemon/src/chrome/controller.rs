@@ -10,6 +10,7 @@ use std::{
 use anyhow::{anyhow, Result};
 use chromiumoxide::{
     cdp::browser_protocol::{
+        browser::{Bounds, GetWindowForTargetParams, SetWindowBoundsParams, WindowState},
         emulation::SetDeviceMetricsOverrideParams,
         page::{NavigateParams, StopScreencastParams},
     },
@@ -26,6 +27,18 @@ use crate::{
 
 use super::{capture, ChromeMessage, ChromeResponse, ChromeState, Preview, Request};
 
+const PROFILE_DIRECTORY: &str = "chromium-profile";
+
+/// Chromium treats these as evidence that another instance owns the profile: it hands the launch
+/// off to that instance, prints no DevTools URL, and exits. A profile this daemon owns
+/// exclusively should never have them at startup, and does whenever the previous browser was
+/// killed rather than closed.
+fn clear_stale_locks(profile: &std::path::Path) {
+    for name in ["SingletonLock", "SingletonSocket", "SingletonCookie"] {
+        let _ = std::fs::remove_file(profile.join(name));
+    }
+}
+
 pub struct ChromeController {
     pub state: Arc<Mutex<ChromeState>>,
     browser: Arc<Mutex<Option<Browser>>>,
@@ -36,6 +49,7 @@ pub struct ChromeController {
     sender: mpsc::Sender<Request>,
     receiver: Mutex<Option<mpsc::Receiver<Request>>>,
     running: AtomicBool,
+    fullscreen: AtomicBool,
 }
 
 impl Default for ChromeController {
@@ -58,6 +72,7 @@ impl ChromeController {
             sender,
             receiver: Mutex::new(Some(receiver)),
             running: AtomicBool::new(false),
+            fullscreen: AtomicBool::new(false),
         }
     }
 
@@ -72,9 +87,12 @@ impl ChromeController {
     pub async fn start(self: &Arc<Self>, app_state: &Arc<AppState>) -> Result<()> {
         let config = app_state.config.read().await;
 
+        self.fullscreen
+            .store(config.device.chromium.fullscreen, Ordering::Relaxed);
+
         if self.browser.lock().await.is_none() {
-            self.launch_browser(&config.device.chromium, &app_state.config.dirs.cache)
-                .await?;
+            self.launch_with_retry(&config.device.chromium, &app_state.config.dirs.cache)
+                .await;
         }
 
         let receiver = self
@@ -102,7 +120,7 @@ impl ChromeController {
                     .or_else(|| std::env::var("CHROMIUM_BINARY").ok())
                     .unwrap_or_else(|| "chromium".to_string()),
             )
-            .user_data_dir(cache.join("chromium-profile"))
+            .user_data_dir(cache.join(PROFILE_DIRECTORY))
             .with_head()
             .disable_default_args()
             .arg("--disable-background-networking")
@@ -132,8 +150,8 @@ impl ChromeController {
             .arg("--disable-session-crashed-bubble")
             .viewport(None);
 
-        // A full-screen window is not subject to the space a layer surface reserves, so the
-        // overlay sidebar needs a window the compositor can tile.
+        // `--kiosk` alone is not enough, because a CDP-created tab drags the window back to its
+        // decorated form. `go_fullscreen` finishes the job once a page exists.
         if config.fullscreen {
             builder = builder.arg("--kiosk");
         } else {
@@ -149,7 +167,29 @@ impl ChromeController {
             .map_err(|error| anyhow!("failed to build browser config: {error}"))
     }
 
+    /// A display that loses its browser has to get it back on its own. Giving up after one
+    /// attempt leaves the daemon serving an API with nothing on the screen until a person
+    /// notices.
+    async fn launch_with_retry(&self, config: &ChromiumConfig, cache: &std::path::Path) {
+        let mut delay = Duration::from_secs(1);
+
+        loop {
+            match self.launch_browser(config, cache).await {
+                Ok(()) => return,
+                Err(error) => {
+                    error!("chromium did not start: {error}. retrying in {delay:?}");
+                    tokio::time::sleep(delay).await;
+                    delay = (delay * 2).min(Duration::from_secs(60));
+                }
+            }
+        }
+    }
+
     async fn launch_browser(&self, config: &ChromiumConfig, cache: &std::path::Path) -> Result<()> {
+        let profile = cache.join(PROFILE_DIRECTORY);
+
+        clear_stale_locks(&profile);
+
         let (browser, mut handler) = Browser::launch(Self::build_browser_config(config, cache)?).await?;
 
         tokio::spawn(async move {
@@ -397,6 +437,12 @@ impl ChromeController {
 
             browser.new_page(tab.url.as_str()).await?
         };
+
+        if self.fullscreen.load(Ordering::Relaxed) {
+            if let Err(error) = go_fullscreen(&page).await {
+                warn!("could not put the browser window into fullscreen: {error}");
+            }
+        }
 
         if let Some(scale) = tab.scale {
             let (width, height) = self.output_size(&page).await.unwrap_or((1920, 1080));
@@ -689,6 +735,27 @@ fn align_to_wall_clock(interval: Duration) -> Duration {
     }
 }
 
+
+/// `--kiosk` covers the output but leaves the tab strip and omnibox drawn, because a target
+/// created through CDP is a tab and a tab needs somewhere to live. Putting the window itself into
+/// fullscreen is the presentation change `F11` makes, and that does hide them.
+async fn go_fullscreen(page: &Page) -> Result<()> {
+    let window = page
+        .execute(
+            GetWindowForTargetParams::builder()
+                .target_id(page.target_id().clone())
+                .build(),
+        )
+        .await?;
+
+    page.execute(SetWindowBoundsParams::new(
+        window.window_id,
+        Bounds::builder().window_state(WindowState::Fullscreen).build(),
+    ))
+    .await?;
+
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;

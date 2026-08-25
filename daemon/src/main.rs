@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
+use tokio::signal::unix::SignalKind;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -66,7 +67,7 @@ async fn main() -> Result<()> {
 
     tokio::select! {
         _ = http => {}
-        _ = tokio::signal::ctrl_c() => info!("interrupted"),
+        signal = shutdown_signal() => info!(%signal, "shutting down"),
     }
 
     // Without this the browser survives the daemon and the next start finds a second one.
@@ -75,6 +76,31 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// systemd stops a service with SIGTERM, so listening for SIGINT alone means every `systemctl
+/// restart` kills the daemon before it can close the browser. Chromium is then killed with the
+/// rest of the cgroup and leaves its profile locked against the next start.
+async fn shutdown_signal() -> &'static str {
+    let mut terminate = match tokio::signal::unix::signal(SignalKind::terminate()) {
+        Ok(signal) => signal,
+        Err(error) => {
+            error!("cannot listen for SIGTERM: {error}");
+
+            return "none";
+        }
+    };
+
+    tokio::select! {
+        _ = terminate.recv() => "SIGTERM",
+        result = tokio::signal::ctrl_c() => {
+            if let Err(error) = result {
+                error!("cannot listen for SIGINT: {error}");
+            }
+
+            "SIGINT"
+        }
+    }
 }
 
 async fn run_schedule(state: Arc<AppState>) {

@@ -82,8 +82,13 @@ password = { env = "MISSIOND_MQTT_PASSWORD" }
 
 ### fullscreen
 
-Defaults to `true`, which passes `--kiosk`. The browser covers the output and draws none of its
-own interface: no tab strip, no omnibox, no profile button.
+Defaults to `true`. The browser covers the output and draws none of its own interface: no tab
+strip, no omnibox, no profile button.
+
+This takes two things, not one. `--kiosk` covers the output, but a tab created over CDP needs a
+tab strip to live in and drags the window back to its decorated form, so the daemon also puts the
+window itself into fullscreen through `Browser.setWindowBounds`. That is the presentation change
+`F11` makes, and it is what actually hides the browser interface.
 
 Setting it to `false` starts a maximised window the compositor tiles instead. A full-screen window
 is not subject to the space a layer surface reserves, so a reserved overlay sidebar will need this
