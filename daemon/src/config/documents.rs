@@ -1,4 +1,6 @@
-use super::{DeviceDocument, DisplayDocument, PlaylistsDocument, TabsDocument};
+use super::{
+    DeviceDocument, DisplayDocument, NotificationsDocument, PlaylistsDocument, TabsDocument,
+};
 
 #[derive(Debug, Clone)]
 pub struct Documents {
@@ -6,4 +8,5 @@ pub struct Documents {
     pub display: DisplayDocument,
     pub tabs: TabsDocument,
     pub playlists: PlaylistsDocument,
+    pub notifications: NotificationsDocument,
 }

@@ -29,14 +29,67 @@ use super::{capture, ChromeMessage, ChromeResponse, ChromeState, Preview, Reques
 
 const PROFILE_DIRECTORY: &str = "chromium-profile";
 
+/// Tabs the daemon opens for itself. They are not in `tabs.toml` and never appear in a playlist.
+const ALERT_TAB: &str = "missiond:alert";
+const STINGER_TAB: &str = "missiond:stinger";
+
+/// Chromium records the owning instance as a `<hostname>-<pid>` symlink at `SingletonLock`.
+fn lock_owner(profile: &std::path::Path) -> Option<u32> {
+    let target = std::fs::read_link(profile.join("SingletonLock")).ok()?;
+
+    target.to_str()?.rsplit('-').next()?.parse().ok()
+}
+
+fn is_alive(pid: u32) -> bool {
+    std::path::Path::new(&format!("/proc/{pid}")).exists()
+}
+
 /// Chromium treats these as evidence that another instance owns the profile: it hands the launch
-/// off to that instance, prints no DevTools URL, and exits. A profile this daemon owns
-/// exclusively should never have them at startup, and does whenever the previous browser was
-/// killed rather than closed.
+/// off to that instance, prints no DevTools URL, and exits.
+///
+/// Removing them unconditionally is worse than leaving them. A lock whose owner is still running
+/// is doing its job, and clearing it lets a second Chromium open the same profile, which is what
+/// produces "something went wrong during profile initialization" and a window per attempt.
 fn clear_stale_locks(profile: &std::path::Path) {
+    if let Some(pid) = lock_owner(profile) {
+        if is_alive(pid) {
+            warn!("chromium {pid} still holds {}, leaving its lock alone", profile.display());
+
+            return;
+        }
+
+        info!("clearing the profile lock left by chromium {pid}");
+    }
+
     for name in ["SingletonLock", "SingletonSocket", "SingletonCookie"] {
         let _ = std::fs::remove_file(profile.join(name));
     }
+}
+
+/// A browser holding our profile that we cannot talk to is worse than no browser: every launch
+/// after it either fails or opens a second instance on the same profile. The daemon owns this
+/// profile exclusively, so whatever holds it is ours to stop.
+fn terminate_profile_holder(profile: &std::path::Path) {
+    let Some(pid) = lock_owner(profile).filter(|pid| is_alive(*pid)) else {
+        return;
+    };
+
+    warn!("terminating orphaned chromium {pid} holding the profile");
+
+    // SIGTERM lets it write the profile out and remove its own lock.
+    let _ = std::process::Command::new("kill")
+        .args(["-TERM", &pid.to_string()])
+        .status();
+
+    for _ in 0..20 {
+        if !is_alive(pid) {
+            return;
+        }
+
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    warn!("chromium {pid} did not exit after SIGTERM");
 }
 
 pub struct ChromeController {
@@ -91,8 +144,12 @@ impl ChromeController {
             .store(config.device.chromium.fullscreen, Ordering::Relaxed);
 
         if self.browser.lock().await.is_none() {
-            self.launch_with_retry(&config.device.chromium, &app_state.config.dirs.cache)
-                .await;
+            let cache = &app_state.config.dirs.cache;
+
+            // systemd kills the browser with the rest of the cgroup, but a crash or a manual
+            // kill of the daemon alone leaves it running and holding the profile.
+            terminate_profile_holder(&cache.join(PROFILE_DIRECTORY));
+            self.launch_with_retry(&config.device.chromium, cache).await;
         }
 
         let receiver = self
@@ -178,6 +235,12 @@ impl ChromeController {
                 Ok(()) => return,
                 Err(error) => {
                     error!("chromium did not start: {error}. retrying in {delay:?}");
+
+                    // A failed launch can still leave a live Chromium behind: the timeout is on
+                    // reading the DevTools URL, not on the process. Retrying past it would put a
+                    // second instance on the same profile.
+                    terminate_profile_holder(&cache.join(PROFILE_DIRECTORY));
+
                     tokio::time::sleep(delay).await;
                     delay = (delay * 2).min(Duration::from_secs(60));
                 }
@@ -292,6 +355,18 @@ impl ChromeController {
                     auto_rotate: state.auto_rotate,
                 })
             }
+            ChromeMessage::Takeover {
+                tab_id,
+                stinger,
+                seconds,
+            } => {
+                self.takeover(tab_id, stinger, seconds, app_state).await?;
+                Ok(ChromeResponse::Success)
+            }
+            ChromeMessage::EndTakeover => {
+                self.end_takeover(app_state).await?;
+                Ok(ChromeResponse::Success)
+            }
             ChromeMessage::Shutdown => {
                 self.shutdown().await?;
                 Ok(ChromeResponse::Success)
@@ -371,13 +446,16 @@ impl ChromeController {
         playlist_id: &str,
         app_state: &Arc<AppState>,
     ) -> Result<()> {
-        let tab = app_state
-            .config
-            .tab(tab_id)
-            .await
-            .ok_or_else(|| anyhow!("tab {tab_id} not found"))?;
-
+        // An open page is enough to bring forward. The alert and transition pages are opened by
+        // the daemon rather than declared in `tabs.toml`, so requiring a config entry here would
+        // make them impossible to show.
         if !self.pages.lock().await.contains_key(tab_id) {
+            let tab = app_state
+                .config
+                .tab(tab_id)
+                .await
+                .ok_or_else(|| anyhow!("tab {tab_id} not found"))?;
+
             self.create_tab_page(&tab).await?;
         }
 
@@ -410,10 +488,188 @@ impl ChromeController {
         let tabs = app_state.config.playlist_tabs(playlist_id).await;
 
         app_state.hass.publish_tab_options(&tabs, Some(tab_id)).await;
-        app_state.hass.publish_url(&tab.url).await;
+
+        if let Some(tab) = app_state.config.tab(tab_id).await {
+            app_state.hass.publish_url(&tab.url).await;
+        }
+
         app_state.events.publish(app_state).await;
 
         Ok(())
+    }
+
+    /// Puts an alert on screen. `tab_id` shows an existing tab, such as a camera feed; without
+    /// one the alert page shows the message itself.
+    ///
+    /// The stinger is what makes a slow tab usable. The target starts loading first and the clip
+    /// covers the wait, so the viewer sees a deliberate transition rather than a blank page.
+    async fn takeover(
+        &self,
+        tab_id: Option<String>,
+        stinger: Option<String>,
+        seconds: u64,
+        app_state: &Arc<AppState>,
+    ) -> Result<()> {
+        let playlist_id = self.state.lock().await.current_playlist_id.clone();
+
+        {
+            let mut state = self.state.lock().await;
+
+            // Only the first alert records where to go back to. A second one arriving during a
+            // takeover must not make the alert page itself the thing we return to.
+            if state.interrupted_tab_id.is_none() {
+                state.interrupted_tab_id = state.current_tab_id.clone();
+            }
+        }
+
+        self.stop_auto_rotation().await;
+
+        let target = match tab_id {
+            Some(tab_id) => tab_id,
+            None => ALERT_TAB.to_string(),
+        };
+
+        // Creating the page starts the navigation and returns; the load continues underneath.
+        // Doing it before the clip plays is the whole point of playing one.
+        self.ensure_page(&target, app_state).await;
+
+        if let Some(stinger) = stinger {
+            self.play_stinger(&stinger, app_state).await;
+        }
+
+        let playlist_id = playlist_id.unwrap_or_default();
+
+        self.activate_tab(&target, &playlist_id, app_state).await?;
+
+        {
+            let mut state = self.state.lock().await;
+
+            state.hold_until = Some(Instant::now() + Duration::from_secs(seconds));
+        }
+
+        Ok(())
+    }
+
+    /// Returns to whatever the playlist was showing, and lets rotation continue.
+    async fn end_takeover(&self, app_state: &Arc<AppState>) -> Result<()> {
+        let (playlist_id, interrupted) = {
+            let mut state = self.state.lock().await;
+
+            state.hold_until = None;
+
+            (
+                state.current_playlist_id.clone(),
+                state.interrupted_tab_id.take(),
+            )
+        };
+
+        let Some(playlist_id) = playlist_id else {
+            return Ok(());
+        };
+
+        if let Some(tab_id) = interrupted {
+            self.activate_tab(&tab_id, &playlist_id, app_state).await?;
+        }
+
+        if let Some(playlist) = app_state.config.playlist(&playlist_id).await {
+            self.start_auto_rotation(playlist.interval.into()).await;
+        }
+
+        Ok(())
+    }
+
+    /// The alert page is not in `tabs.toml`; the daemon serves it and opens it on demand.
+    async fn ensure_page(&self, tab_id: &str, app_state: &Arc<AppState>) {
+        if tab_id == ALERT_TAB {
+            let alert = Tab {
+                tab_id: ALERT_TAB.to_string(),
+                name: None,
+                url: self.own_url(app_state, "notify.html").await,
+                persist: false,
+                scale: None,
+                stinger: None,
+            };
+
+            if let Err(error) = self.recreate_from(&alert).await {
+                warn!("failed to open the alert page: {error}");
+            }
+
+            return;
+        }
+
+        if self.pages.lock().await.contains_key(tab_id) {
+            return;
+        }
+
+        let Some(tab) = app_state.config.tab(tab_id).await else {
+            warn!("takeover asked for {tab_id}, which is not a configured tab");
+
+            return;
+        };
+
+        if let Err(error) = self.create_tab_page(&tab).await {
+            warn!("failed to open {tab_id} for a takeover: {error}");
+        }
+    }
+
+    /// The pages the daemon serves to itself. Loopback, because the browser is on this machine
+    /// whatever address the API is bound to.
+    async fn own_url(&self, app_state: &Arc<AppState>, path: &str) -> String {
+        let port = app_state.config.read().await.device.http.port;
+
+        format!("http://127.0.0.1:{port}/{path}")
+    }
+
+    async fn play_stinger(&self, name: &str, app_state: &Arc<AppState>) {
+        let notifications = app_state.config.read().await.notifications;
+
+        let Some(stinger) = notifications.stinger(name) else {
+            warn!("no stinger named {name}");
+
+            return;
+        };
+
+        let tab = Tab {
+            tab_id: STINGER_TAB.to_string(),
+            name: None,
+            url: self.own_url(app_state, &format!("stinger.html?name={name}")).await,
+            persist: false,
+            scale: None,
+            stinger: None,
+        };
+
+        if let Err(error) = self.recreate_from(&tab).await {
+            warn!("failed to show the stinger: {error}");
+
+            return;
+        }
+
+        let playlist_id = self
+            .state
+            .lock()
+            .await
+            .current_playlist_id
+            .clone()
+            .unwrap_or_default();
+
+        if let Err(error) = self
+            .activate_tab(STINGER_TAB, &playlist_id, app_state)
+            .await
+        {
+            warn!("failed to bring the stinger forward: {error}");
+
+            return;
+        }
+
+        tokio::time::sleep(stinger.max_duration.into()).await;
+    }
+
+    async fn recreate_from(&self, tab: &Tab) -> Result<()> {
+        if self.pages.lock().await.contains_key(&tab.tab_id) {
+            self.close_tab(&tab.tab_id).await?;
+        }
+
+        self.create_tab_page(tab).await
     }
 
     async fn hold(&self, playlist_id: &str, app_state: &Arc<AppState>) {

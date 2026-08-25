@@ -29,6 +29,7 @@ impl ConfigStore {
             display: read_document(&dirs.config, Document::Display)?,
             tabs: read_document(&dirs.config, Document::Tabs)?,
             playlists: read_document(&dirs.config, Document::Playlists)?,
+            notifications: read_document(&dirs.config, Document::Notifications)?,
         };
 
         info!(
@@ -125,6 +126,9 @@ impl ConfigStore {
             Document::Display => write_document(&self.dirs.config, document, &config.display),
             Document::Tabs => write_document(&self.dirs.config, document, &config.tabs),
             Document::Playlists => write_document(&self.dirs.config, document, &config.playlists),
+            Document::Notifications => {
+                write_document(&self.dirs.config, document, &config.notifications)
+            }
         }?;
 
         Ok(Persisted::ToDisk)
@@ -153,6 +157,10 @@ impl ConfigStore {
             format!(
                 "# playlists.toml\n{}",
                 toml::to_string_pretty(&config.playlists)?
+            ),
+            format!(
+                "# notifications.toml\n{}",
+                toml::to_string_pretty(&config.notifications)?
             ),
         ]
         .join("\n"))

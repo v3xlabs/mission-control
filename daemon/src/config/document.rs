@@ -4,6 +4,7 @@ pub enum Document {
     Display,
     Tabs,
     Playlists,
+    Notifications,
 }
 
 impl Document {
@@ -13,6 +14,7 @@ impl Document {
             Self::Display => "display.toml",
             Self::Tabs => "tabs.toml",
             Self::Playlists => "playlists.toml",
+            Self::Notifications => "notifications.toml",
         }
     }
 }

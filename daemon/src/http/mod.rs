@@ -39,6 +39,7 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
             get(preview_live).data(state.clone()),
         )
         .at("/api/screen", get(screen).data(state.clone()))
+        .at("/api/media/:name", get(media).data(state.clone()))
         .at("/api/events", get(events).data(state.clone()))
         .nest("/api", api_service)
         .nest("/docs", ui)
@@ -152,4 +153,67 @@ fn events(state: Data<&Arc<AppState>>) -> SSE {
         }
     })
     .keep_alive(Duration::from_secs(30))
+}
+
+/// Serves a stinger clip out of the config directory's `media`.
+#[handler]
+async fn media(state: Data<&Arc<AppState>>, name: Path<String>) -> impl IntoResponse {
+    if !is_plain_file_name(&name.0) {
+        return not_found("no such media file");
+    }
+
+    let file = state.config.dirs.config.join("media").join(&name.0);
+
+    match tokio::fs::read(&file).await {
+        Ok(bytes) => Response::builder()
+            .content_type(content_type(&file))
+            .body(Body::from_bytes(bytes.into())),
+        Err(_) => not_found("no such media file"),
+    }
+}
+
+/// The name arrives from a page, so it is checked rather than resolved. Canonicalising instead
+/// would reject the legitimate case, because a Nix-generated config directory reaches its files
+/// through symlinks into other store paths.
+fn is_plain_file_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('.')
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains('\0')
+}
+
+fn content_type(file: &std::path::Path) -> &'static str {
+    match file.extension().and_then(|extension| extension.to_str()) {
+        Some("webm") => "video/webm",
+        Some("mp4") => "video/mp4",
+        Some("gif") => "image/gif",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        _ => "application/octet-stream",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plain_file_name;
+
+    #[test]
+    fn a_plain_name_is_allowed() {
+        assert!(is_plain_file_name("doorbell.webm"));
+    }
+
+    #[test]
+    fn traversal_is_refused() {
+        assert!(!is_plain_file_name("../device.toml"));
+        assert!(!is_plain_file_name("nested/clip.webm"));
+        assert!(!is_plain_file_name("..\\device.toml"));
+    }
+
+    #[test]
+    fn hidden_and_empty_names_are_refused() {
+        assert!(!is_plain_file_name(".."));
+        assert!(!is_plain_file_name(".hidden"));
+        assert!(!is_plain_file_name(""));
+    }
 }

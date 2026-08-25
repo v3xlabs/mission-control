@@ -9,6 +9,8 @@ pub struct UpsertTabRequest {
     pub url: String,
     pub persist: Option<bool>,
     pub scale: Option<f64>,
+    /// A stinger played while this tab loads, by name from `notifications.toml`.
+    pub stinger: Option<String>,
 }
 
 impl UpsertTabRequest {
@@ -19,6 +21,7 @@ impl UpsertTabRequest {
             url: self.url,
             persist: self.persist.unwrap_or(true),
             scale: self.scale,
+            stinger: self.stinger,
         }
     }
 }

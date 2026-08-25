@@ -19,6 +19,7 @@ pub mod display;
 pub mod events;
 pub mod hass;
 pub mod http;
+pub mod notifications;
 pub mod state;
 
 #[tokio::main]

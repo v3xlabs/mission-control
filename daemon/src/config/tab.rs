@@ -11,6 +11,9 @@ pub struct Tab {
     pub persist: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scale: Option<f64>,
+    /// A stinger played while this tab loads, by name from `notifications.toml`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stinger: Option<String>,
 }
 
 const fn persist_by_default() -> bool {

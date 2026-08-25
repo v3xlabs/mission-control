@@ -9,6 +9,7 @@ use crate::{
     display::{capture::OutputCapture, Display},
     events::Events,
     hass::HassManager,
+    notifications::{Notifications, Sidebar},
 };
 
 pub type State = Arc<AppState>;
@@ -19,6 +20,8 @@ pub struct AppState {
     pub display: Arc<Display>,
     pub capture: Arc<OutputCapture>,
     pub events: Arc<Events>,
+    pub notifications: Arc<Notifications>,
+    pub sidebar: Arc<Sidebar>,
     pub hass: Arc<HassManager>,
     pub runtime: Runtime,
     pub admin_key: Option<String>,
@@ -46,6 +49,8 @@ impl AppState {
             display: Arc::new(Display::new()),
             capture: Arc::new(OutputCapture::new()),
             events: Arc::new(Events::new()),
+            notifications: Arc::new(Notifications::new()),
+            sidebar: Arc::new(Sidebar::new()),
             hass: Arc::new(hass),
             runtime,
             admin_key,

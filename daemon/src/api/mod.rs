@@ -5,6 +5,8 @@ pub mod display;
 pub mod error;
 pub mod error_body;
 pub mod mutation_result;
+pub mod notifications;
+pub mod notify_request;
 pub mod playback;
 pub mod playlist_info;
 pub mod playlists;
@@ -12,6 +14,7 @@ pub mod reorder_request;
 pub mod set_brightness_request;
 pub mod set_enabled_request;
 pub mod status;
+pub mod stinger_info;
 pub mod system;
 pub mod tab_info;
 pub mod tabs;
@@ -22,10 +25,12 @@ pub use device_status::DeviceStatus;
 pub use error::{ApiError, ApiResult};
 pub use error_body::ErrorBody;
 pub use mutation_result::MutationResult;
+pub use notify_request::NotifyRequest;
 pub use playlist_info::PlaylistInfo;
 pub use reorder_request::ReorderRequest;
 pub use set_brightness_request::SetBrightnessRequest;
 pub use set_enabled_request::SetEnabledRequest;
+pub use stinger_info::StingerInfo;
 pub use tab_info::TabInfo;
 pub use upsert_tab_request::UpsertTabRequest;
 
@@ -36,8 +41,8 @@ use poem_openapi::OpenApiService;
 use crate::state::AppState;
 
 use self::{
-    display::DisplayApi, playback::PlaybackApi, playlists::PlaylistApi, status::StatusApi,
-    system::SystemApi, tabs::TabApi,
+    display::DisplayApi, notifications::NotificationApi, playback::PlaybackApi,
+    playlists::PlaylistApi, status::StatusApi, system::SystemApi, tabs::TabApi,
 };
 
 type Apis = (
@@ -47,6 +52,7 @@ type Apis = (
     PlaybackApi,
     DisplayApi,
     SystemApi,
+    NotificationApi,
 );
 
 pub fn create_api_service(state: Arc<AppState>) -> OpenApiService<Apis, ()> {
@@ -66,7 +72,10 @@ pub fn create_api_service(state: Arc<AppState>) -> OpenApiService<Apis, ()> {
         DisplayApi {
             state: state.clone(),
         },
-        SystemApi { state },
+        SystemApi {
+            state: state.clone(),
+        },
+        NotificationApi { state },
     );
 
     OpenApiService::new(apis, "Mission Control API", "0.1.0").server("/")

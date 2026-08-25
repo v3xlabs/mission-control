@@ -271,3 +271,87 @@ cannot spawn a capture per frame.
 
 The default command is `grim`, which needs to be on the daemon's PATH. Under the NixOS module,
 add it to `extraPackages`.
+
+## notifications.toml
+
+```toml
+version = 1
+mode = "takeover"
+default_duration = "20s"
+sidebar_width = 480
+
+[stingers.doorbell]
+file = "doorbell.webm"
+max_duration = "2s"
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `mode` | `takeover` or `sidebar` | What an alert does by default. A single alert can override it. |
+| `default_duration` | duration | How long an alert stays up when the caller does not say. |
+| `sidebar_width` | integer | How wide the sidebar window asks to be. The compositor has the final say. |
+| `stingers` | table | Named clips, keyed by the name a tab or an alert refers to. |
+
+### takeover and sidebar
+
+**Takeover** makes the alert the thing on screen. Rotation stops, and when the alert expires the
+display returns to the tab it interrupted rather than to wherever rotation would have reached.
+
+**Sidebar** opens the alert as its own window beside the content and leaves the playlist running.
+It is a second browser window in Chromium's app mode, not a layer-shell surface: the compositor is
+already a tiling one, so it opens, gets a column, and the display shrinks to make room. The window
+carries its own app id, `missiond-sidebar`, so a window rule can place or size it, and its own
+profile, so it cannot disturb the display's.
+
+### Stingers
+
+A stinger is a clip played while the screen changes. It is not decoration. A camera feed takes
+seconds to connect, and a viewer watching a blank page reads that as broken. The target starts
+loading first, the clip covers the wait, and the switch happens behind it.
+
+```toml
+[[tabs]]
+tab_id = "front-door"
+url = "http://camera.example/stream"
+stinger = "doorbell"
+```
+
+Files live in `media` inside the config directory. That directory can be a Nix store path, which
+makes a clip a build input like anything else. `max_duration` cuts the clip off even if it has not
+ended, so a mis-encoded file cannot strand the display mid-transition.
+
+### Raising an alert
+
+```bash
+curl -X POST http://display.example:3000/api/notify \
+  -H "authorization: Bearer $MISSIOND_ADMIN_KEY" \
+  -H 'content-type: application/json' \
+  -d '{
+        "title": "Front door",
+        "body": "Someone is at the door",
+        "level": "warning",
+        "tab_id": "front-door",
+        "stinger": "doorbell",
+        "duration": "30s"
+      }'
+```
+
+| Field | Notes |
+| --- | --- |
+| `title`, `body` | What the alert card shows. `body` is optional. |
+| `level` | `info`, `warning` or `critical`. Colours one edge of the card. |
+| `mode` | Overrides `mode` for this alert. |
+| `duration` | Overrides `default_duration`. |
+| `tab_id` | Show this tab instead of a card. This is what turns a doorbell alert into the camera feed rather than the word "doorbell". |
+| `stinger` | A clip to cover the change. |
+
+The call returns as soon as the alert is queued. A transition can take seconds and the caller is
+usually a doorbell or an automation, so it is not held open while the screen changes.
+
+| Method | Path | Does |
+| --- | --- | --- |
+| POST | `/api/notify` | Raise an alert. |
+| GET | `/api/notifications` | What is currently showing. The alert pages read this. |
+| DELETE | `/api/notifications/:notification_id` | Clear one early. |
+| GET | `/api/stingers` | The configured clips, so the transition page can resolve a name. |
+| GET | `/api/media/:name` | A file from the config directory's `media`. |
