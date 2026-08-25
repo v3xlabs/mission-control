@@ -1,43 +1,32 @@
-import { FC } from "react";
+import { type FC } from "react";
+
 import { usePlaylists } from "../api/playlists";
-import { PlaylistCard } from "../widgets/PlaylistCard";
-import { EnhancedPlaylistCard } from "../components/EnhancedPlaylistCard";
 import { CreatePlaylistDialog } from "../components/CreatePlaylistDialog";
-import type { components } from "../api/schema.gen";
+import { PlaylistCard } from "../components/PlaylistCard";
 
-type PlaylistInfo = components["schemas"]["PlaylistInfo"];
+export const PlaylistList: FC = () => {
+  const { data: playlists, isLoading, error } = usePlaylists();
 
-export const PlaylistList: FC<{}> = ({}) => {
-  const playlists = usePlaylists();
+  if (isLoading) {
+    return <p className="p-4 text-gray-500">Loading playlists...</p>;
+  }
 
-  if (playlists.isLoading) return <div className="text-center text-gray-400 py-8">Loading...</div>;
-  if (playlists.error || !playlists.data) return <div className="text-center text-red-400 py-8">Error loading playlists</div>;
+  if (error || !playlists) {
+    return <p className="p-4 text-red-400">Could not load playlists.</p>;
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header with create button */}
+    <div className="flex flex-col gap-6 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-100">Playlists</h2>
+        <h2 className="text-lg font-semibold text-gray-100">Playlists</h2>
         <CreatePlaylistDialog />
       </div>
 
-      {/* Playlists grid */}
-      {playlists.data.length > 0 ? (
-        <div className="space-y-6">
-          {playlists.data.map((pl: PlaylistInfo) => (
-            <EnhancedPlaylistCard key={pl.id} playlist={pl} />
+      {playlists.length === 0
+        ? <p className="text-gray-500">No playlists configured.</p>
+        : playlists.map(playlist => (
+            <PlaylistCard key={playlist.playlist_id} playlist={playlist} />
           ))}
-        </div>
-      ) : (
-        <div className="text-center text-gray-400 py-12">
-          <p className="text-lg mb-4">No playlists found</p>
-          <CreatePlaylistDialog trigger={
-            <button className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
-              Create Your First Playlist
-            </button>
-          } />
-        </div>
-      )}
     </div>
   );
-}; 
+};

@@ -1,91 +1,92 @@
-# Mission Control
+# missiond
 
-Mission Control is a tool for managing your information displays.
-It is a standalone binary that you can run on any linux (x86 or arm) machine using xorg.
+missiond is the daemon that owns an information display. It holds the content, the screen power,
+and one control surface that a browser, Home Assistant and launchpi all drive.
+
+It runs on a Wayland session, starts Chromium, and rotates a playlist of tabs. What is on screen
+is decided here rather than by the pages themselves.
 
 Features:
 
-- 🖥️ **Digital Signage Management**: Control multiple displays, playlists, and tabs
-- 🏠 **Home Assistant Integration**: MQTT-based device discovery and control
-- 🌐 **Web UI**: Modern React-based dashboard for monitoring and control
-- 🎛️ **REST API**: OpenAPI-documented endpoints for programmatic control
-- 📱 **Live Previews**: Real-time tab screenshots and live streaming
-
-We recommend you use a setup [as described here](https://env.md/networks/information-displays.html).
-
-## Installation
-
-Simply download the latest binary from the releases page and run it on your machine.
-You could also easily grab the [latest x86 binary](https://github.com/v3xlabs/mission-control/releases/latest/download/v3x-mission-control-x86_64) or the [latest arm binary](https://github.com/v3xlabs/mission-control/releases/latest/download/v3x-mission-control-arm64) from these links.
-
-## Web UI
-
-Mission Control includes a built-in web interface accessible at `http://localhost:3000` once the server is running. The web UI provides:
-
-- 📊 **Dashboard**: Overview of all playlists and their current status
-- 🖼️ **Live Previews**: Thumbnail previews of each tab with live updates
-- ⚡ **Quick Controls**: Click to activate playlists or switch to specific tabs
-- 📈 **Device Status**: Real-time monitoring of device state and uptime
-
-## Development
-
-### Building from Source
-
-1. **Build Web UI**:
-
-```bash
-cd web
-pnpm install
-pnpm dev
-```
-
-The web development server runs on `http://localhost:5173` and proxies API calls to the backend.
-
-1. **Build Backend**:
-
-```bash
-cd app
-cargo run
-```
+- Playlists of tabs, rotated on a wall-clock aligned interval
+- Screen power and DDC brightness, on a weekly schedule
+- Poweroff, reboot and suspend over logind
+- Home Assistant MQTT discovery for the screen, the playlist and the tab
+- A web UI with live previews, driven by a server sent event stream
+- An OpenAPI-documented REST API
+- A NixOS module that declares the whole configuration
 
 ## Configuration
 
-The configuration is stored at `./config.toml` or `~/.config/v3x-mission-control/config.toml`.
+missiond reads a directory of TOML documents. See [docs/configuration.md](docs/configuration.md)
+for the schema.
 
-A sample configuration look as follows:
+| Directory | Resolution order | Holds |
+| --- | --- | --- |
+| config | `MISSIOND_CONFIG_DIR`, `$XDG_CONFIG_HOME/missiond`, `~/.config/missiond` | The TOML documents. The only directory worth backing up. |
+| state | `MISSIOND_STATE_DIR`, `$XDG_STATE_HOME/missiond`, `~/.local/state/missiond` | `runtime.sqlite3`. Deleting it costs one restart. |
+| cache | `MISSIOND_CACHE_DIR`, `$XDG_CACHE_HOME/missiond`, `~/.cache/missiond` | The Chromium profile. |
 
-```toml
-[homeassistant]
-mqtt_url = "mqtt://localhost:1883"
-mqtt_username = "username"
-mqtt_password = "password"
+## NixOS
 
-[device]
-name = "My Display"
-id = "my_display_1"
+```nix
+{
+  inputs.missiond.url = "github:v3xlabs/missiond";
 
-[display]
-# sleep time in seconds
-sleep_time = 10
+  # in your configuration
+  imports = [inputs.missiond.nixosModules.default];
 
-[chromium]
-enabled = true
-# optional
-binary_path = "/usr/bin/chromium"
+  services.missiond = {
+    enable = true;
+    user = "display";
+    host = "0.0.0.0";
+    openFirewall = true;
+    adminKeyFile = config.sops.secrets.missiond_admin_key.path;
 
-[chromium.tabs.my_homepage]
-url = "https://v3x.fyi/s1"
-persist = true
+    settings = {
+      name = "Lobby Display";
+      device_id = "lobby-display";
 
-[chromium.tabs.google_news]
-url = "https://news.google.com/topstories"
-persist = true
+      display.output = "DP-1";
+      display.schedule = [
+        {
+          days = ["mon" "tue" "wed" "thu" "fri"];
+          from = "07:30";
+          to = "23:00";
+        }
+      ];
 
-[chromium.playlists.my_playlist]
-tabs = [
-    "my_homepage",
-    "google_news",
-]
-# Alternate between tabs every 30 seconds
-interval = 30
+      tabs.grafana-overview.url = "http://127.0.0.1:3001/d/mission-overview?kiosk";
+
+      playlists.mission-display = {
+        interval = "1m";
+        is_default = true;
+        tabs = ["grafana-overview"];
+      };
+    };
+  };
+}
 ```
+
+`settings` generates the config directory into the Nix store, which is read-only. The web UI can
+still change anything, and says so: a change applies to the running display immediately and does
+not survive a restart. `GET /api/config/export` returns the effective configuration as TOML, so a
+change worth keeping can be moved back into your Nix.
+
+Leave `settings` unset to let missiond own its config directory and write to it.
+
+## Development
+
+Everything is in the flake devshell.
+
+```bash
+nix develop
+just          # list the recipes
+just dev      # run the daemon
+just web      # run the web UI against it on :5173
+just kiosk    # run the daemon inside a nested cage session
+just check    # clippy, tests, typecheck, lint
+just build    # build the web UI, embed it, build the release binary
+```
+
+`just schema` regenerates `web/src/api/schema.gen.ts` from a running daemon.

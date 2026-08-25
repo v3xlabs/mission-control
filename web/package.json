@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "api-schema": "openapi-typescript http://localhost:3000/docs/spec --output ./src/api/schema.gen.ts",
-    "dev": "pnpm api-schema && vite",
+    "api-schema": "openapi-typescript ${MISSIOND_URL:-http://localhost:3000}/docs/spec --output ./src/api/schema.gen.ts",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src eslint.config.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -33,10 +34,13 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
+    "eslint": "^10.9.1",
+    "eslint-plugin-v3xlabs": "^1.8.1",
     "openapi-typescript": "^7.9.1",
     "postcss": "^8.4.34",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.2",
     "vite": "^7.1.12"
-  }
+  },
+  "type": "module"
 }

@@ -4,6 +4,140 @@
  */
 
 export interface paths {
+    "/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is on screen, and how the daemon is configured to persist changes. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["DeviceStatus"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/config/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The whole configuration as TOML, with any inline secret replaced by a reference. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain; charset=utf-8": string;
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/playlists": {
         parameters: {
             query?: never;
@@ -11,7 +145,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get all playlists configured on the device. */
+        /** Every playlist, in configuration order. */
         get: {
             parameters: {
                 query?: never;
@@ -29,14 +163,48 @@ export interface paths {
                         "application/json; charset=utf-8": components["schemas"]["PlaylistInfo"][];
                     };
                 };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
             };
         };
         put?: never;
-        /** Create a new playlist */
+        /** Create a playlist. */
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -51,7 +219,39 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["PlaylistInfo"];
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -69,7 +269,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get all tabs from a given playlist. */
+        /** A playlist's tabs, in play order. */
         get: {
             parameters: {
                 query?: never;
@@ -89,54 +289,68 @@ export interface paths {
                         "application/json; charset=utf-8": components["schemas"]["TabInfo"][];
                     };
                 };
-            };
-        };
-        put?: never;
-        /** Add a tab to a playlist */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    playlist_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json; charset=utf-8": components["schemas"]["AddTabToPlaylistRequest"];
-                };
-            };
-            responses: {
-                200: {
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
         };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/status": {
+    "/playlists/{playlist_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Retrieve basic device status information. */
-        get: {
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a playlist. */
+        delete: {
             parameters: {
                 query?: never;
-                header?: never;
-                path?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    playlist_id: string;
+                };
                 cookie?: never;
             };
             requestBody?: never;
@@ -146,14 +360,43 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["DeviceStatus"];
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
         };
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -168,11 +411,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Activate a playlist */
+        /** Put a playlist on screen. */
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     playlist_id: string;
                 };
@@ -185,7 +430,39 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -205,11 +482,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Activate a tab immediately */
+        /** Put a tab on screen, and hold it there for the playlist's hold duration. */
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     playlist_id: string;
                     tab_id: string;
@@ -223,7 +502,39 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -234,7 +545,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/playlists/{playlist_id}": {
+    "/playlists/{playlist_id}/reorder": {
         parameters: {
             query?: never;
             header?: never;
@@ -242,11 +553,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update an existing playlist */
+        /** Reorder a playlist. The list order is the play order, so this rewrites `playlists.toml`. */
         put: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     playlist_id: string;
                 };
@@ -254,7 +567,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json; charset=utf-8": components["schemas"]["UpdatePlaylistRequest"];
+                    "application/json; charset=utf-8": components["schemas"]["ReorderRequest"];
                 };
             };
             responses: {
@@ -263,19 +576,144 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["PlaylistInfo"];
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
         };
         post?: never;
-        /** Delete a playlist */
-        delete: {
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playlists/{playlist_id}/tabs/{tab_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Include or exclude a tab from a playlist without removing it. */
+        put: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     playlist_id: string;
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["SetEnabledRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playlists/{playlist_id}/tabs/{tab_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add an existing tab to the end of a playlist. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    playlist_id: string;
+                    tab_id: string;
                 };
                 cookie?: never;
             };
@@ -286,7 +724,97 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Remove a tab from one playlist, leaving the tab itself alone. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    playlist_id: string;
+                    tab_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -303,32 +831,60 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Create a new tab */
-        post: {
+        /** Every configured tab, whether or not a playlist uses it. */
+        get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json; charset=utf-8": components["schemas"]["CreateTabRequest"];
-                };
-            };
+            requestBody?: never;
             responses: {
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["TabInfo"];
+                        "application/json; charset=utf-8": components["schemas"]["TabInfo"][];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
         };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -343,11 +899,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update an existing tab */
+        /** Create a tab, or replace one with the same id. */
         put: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     tab_id: string;
                 };
@@ -355,7 +913,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json; charset=utf-8": components["schemas"]["UpdateTabRequest"];
+                    "application/json; charset=utf-8": components["schemas"]["UpsertTabRequest"];
                 };
             };
             responses: {
@@ -364,17 +922,51 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["TabInfo"];
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
         };
         post?: never;
-        /** Delete a tab */
+        /** Remove a tab, and every playlist reference to it. */
         delete: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     tab_id: string;
                 };
@@ -387,90 +979,43 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
                     };
                 };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/playlists/{playlist_id}/tabs/{tab_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove a tab from a playlist */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    playlist_id: string;
-                    tab_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
+                400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/playlists/{playlist_id}/reorder": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Reorder tabs in a playlist */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    playlist_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json; charset=utf-8": components["schemas"]["ReorderTabsRequest"];
-                };
-            };
-            responses: {
-                200: {
+                401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
         };
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -485,11 +1030,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refresh a tab (reload page) */
+        /** Reload a tab's page. */
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     tab_id: string;
                 };
@@ -502,7 +1049,39 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -522,11 +1101,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Recreate a tab (close and reopen) */
+        /** Close and reopen a tab's page. */
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path: {
                     tab_id: string;
                 };
@@ -539,7 +1120,39 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -550,7 +1163,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/playlists/{playlist_id}/tabs/{tab_id}/toggle": {
+    "/playback/next": {
         parameters: {
             query?: never;
             header?: never;
@@ -558,20 +1171,366 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Toggle tab enabled state in playlist */
+        put?: never;
+        /** Advance to the next tab in the current playlist. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playback/previous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step back to the previous tab. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playback/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop rotating. The tab on screen stays there. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/playback/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume rotating, clearing any hold left by a tab chosen by hand. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/display/power/{on}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn the screen on or off. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    on: boolean;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/display/brightness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set panel brightness over DDC. */
         put: {
             parameters: {
                 query?: never;
-                header?: never;
-                path: {
-                    playlist_id: string;
-                    tab_id: string;
+                header?: {
+                    authorization?: string;
                 };
+                path?: never;
                 cookie?: never;
             };
             requestBody: {
                 content: {
-                    "application/json; charset=utf-8": components["schemas"]["ToggleTabEnabledRequest"];
+                    "application/json; charset=utf-8": components["schemas"]["SetBrightnessRequest"];
                 };
             };
             responses: {
@@ -580,7 +1539,39 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain; charset=utf-8": string;
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
                     };
                 };
             };
@@ -592,134 +1583,171 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Power the machine off, reboot, or suspend it, through logind. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    action: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AddTabToPlaylistRequest */
-        AddTabToPlaylistRequest: {
-            tab_id: string;
-            /** Format: int64 */
-            order_index: number;
-            /** Format: int64 */
-            duration_seconds?: number;
-            enabled?: boolean;
-        };
         /** CreatePlaylistRequest */
         CreatePlaylistRequest: {
-            id: string;
-            name: string;
-            /** Format: int64 */
-            interval_seconds: number;
+            playlist_id: string;
+            name?: string;
+            /** @description A duration such as `30s`, `5m` or `1h`. */
+            interval: string;
+            hold?: string;
         };
-        /** CreateTabRequest */
-        CreateTabRequest: {
-            id: string;
-            name: string;
-            url: string;
-            persist?: boolean;
-        };
-        /**
-         * DeviceStatus
-         * @description Current device status
-         */
+        /** DeviceStatus */
         DeviceStatus: {
-            /** @description Device unique identifier */
             device_id: string;
-            /** @description Device display name */
             device_name: string;
-            /** @description Currently active playlist ID (if any) */
-            current_playlist?: string;
-            /** @description Currently active tab ID (if any) */
-            current_tab?: string;
-            /**
-             * Format: uint64
-             * @description Uptime in seconds
-             */
+            current_playlist_id?: string;
+            current_tab_id?: string;
+            auto_rotate: boolean;
+            screen_on: boolean;
+            /** Format: uint32 */
+            brightness: number;
+            /** Format: uint64 */
             uptime_seconds: number;
-            /**
-             * Format: uint64
-             * @description When the current tab was opened (seconds since epoch, if available)
-             */
+            /** Format: uint64 */
             current_tab_opened_at?: number;
+            /** @description True when the config directory is managed elsewhere, so a change made here applies now
+             *     but does not survive a restart. */
+            config_read_only: boolean;
         };
         /**
-         * PlaylistInfo
-         * @description Information about a playlist
+         * ErrorBody
+         * @description What every failure answers with. The API never returns HTTP 200 carrying an error.
          */
+        ErrorBody: {
+            message: string;
+        };
+        /**
+         * MutationResult
+         * @description What a mutation answers with. `persisted` is false when the config directory is managed
+         *     elsewhere, so the change applies to the running display and lasts until the next restart.
+         */
+        MutationResult: {
+            persisted: boolean;
+        };
+        /** PlaylistInfo */
         PlaylistInfo: {
-            /** @description Unique identifier for the playlist */
-            id: string;
-            /** @description Display name of the playlist */
+            playlist_id: string;
             name: string;
-            /**
-             * Format: uint64
-             * @description Number of tabs in the playlist
-             */
+            /** Format: uint64 */
             tab_count: number;
-            /**
-             * Format: int64
-             * @description Interval between tab switches in seconds
-             */
-            interval_seconds: number;
-            /** @description Whether this playlist is currently active */
+            interval: string;
             is_active: boolean;
+            is_default: boolean;
         };
-        /** ReorderTabsRequest */
-        ReorderTabsRequest: {
-            tab_orders: components["schemas"]["TabOrder"][];
+        /** ReorderRequest */
+        ReorderRequest: {
+            /** @description The playlist's tabs, in the order they should play. It must hold exactly the tabs the
+             *     playlist already has, so a stale browser cannot silently drop one. */
+            tab_ids: string[];
         };
-        /**
-         * TabInfo
-         * @description Information about a tab
-         */
-        TabInfo: {
-            /** @description Unique identifier for the tab */
-            id: string;
-            /** @description Display name of the tab */
-            name: string;
-            /** @description URL the tab displays */
-            url: string;
+        /** SetBrightnessRequest */
+        SetBrightnessRequest: {
             /**
-             * Format: uint64
-             * @description Order within the playlist (0-based index)
+             * Format: uint32
+             * @description Percent, 0 through 100.
              */
-            order_index: number;
-            /** @description Whether this tab persists in browser memory */
-            persist: boolean;
-            /**
-             * Format: int32
-             * @description Viewport width in pixels (if available)
-             */
-            viewport_width?: number;
-            /**
-             * Format: int32
-             * @description Viewport height in pixels (if available)
-             */
-            viewport_height?: number;
+            percent: number;
         };
-        /** TabOrder */
-        TabOrder: {
-            tab_id: string;
-            /** Format: int64 */
-            order_index: number;
-        };
-        /** ToggleTabEnabledRequest */
-        ToggleTabEnabledRequest: {
+        /** SetEnabledRequest */
+        SetEnabledRequest: {
             enabled: boolean;
         };
-        /** UpdatePlaylistRequest */
-        UpdatePlaylistRequest: {
-            name?: string;
-            /** Format: int64 */
-            interval_seconds?: number;
-            is_active?: boolean;
+        /** TabInfo */
+        TabInfo: {
+            tab_id: string;
+            name: string;
+            url: string;
+            /** Format: uint64 */
+            order_index: number;
+            persist: boolean;
+            enabled: boolean;
+            /** Format: int32 */
+            viewport_width?: number;
+            /** Format: int32 */
+            viewport_height?: number;
         };
-        /** UpdateTabRequest */
-        UpdateTabRequest: {
+        /** UpsertTabRequest */
+        UpsertTabRequest: {
             name?: string;
-            url?: string;
+            url: string;
             persist?: boolean;
+            /** Format: double */
+            scale?: number;
         };
     };
     responses: never;

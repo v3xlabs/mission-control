@@ -1,30 +1,32 @@
 import { useQuery } from "@tanstack/react-query";
+
 import { apiRequest } from "./api";
+import { failure } from "./request";
 
-const getPlaylists = () => {
-  return {
-    queryKey: ['playlists'],
-    queryFn: async () => {
-      const response = await apiRequest('/playlists', 'get', {});
-      return response.data;
-    },
-  };
-};
+export const usePlaylists = () => useQuery({
+  queryKey: ["playlists"],
+  queryFn: async () => {
+    const response = await apiRequest("/playlists", "get", {});
 
-const getPlaylistTabs = (playlistId: string) => {
-  return {
-    queryKey: ['playlist-tabs', playlistId],
-    queryFn: async () => {
-      const response = await apiRequest('/playlists/{playlist_id}/tabs', 'get', {
-        path: { playlist_id: playlistId }
-      });
-      return response.data;
-    },
-  };
-};
+    if (response.status !== 200) {
+      throw failure(response);
+    }
 
-export const usePlaylists = () =>
-  useQuery(getPlaylists());
+    return response.data;
+  },
+});
 
-export const usePlaylistTabs = (playlistId: string) =>
-  useQuery(getPlaylistTabs(playlistId)); 
+export const usePlaylistTabs = (playlistId: string) => useQuery({
+  queryKey: ["playlist-tabs", playlistId],
+  queryFn: async () => {
+    const response = await apiRequest("/playlists/{playlist_id}/tabs", "get", {
+      path: { playlist_id: playlistId },
+    });
+
+    if (response.status !== 200) {
+      throw failure(response);
+    }
+
+    return response.data;
+  },
+});

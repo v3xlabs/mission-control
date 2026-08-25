@@ -1,14 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "../api/api";
 
-export const useStatus = () => {
-  return useQuery({
-    queryKey: ['status'],
-    queryFn: async () => {
-      const response = await apiRequest('/status', 'get', {});
-      return response.data;
-    },
-    refetchInterval: 5000,
-    staleTime: 500,
-  });
-};
+import { apiRequest } from "../api/api";
+import { failure } from "../api/request";
+
+export const useStatus = () => useQuery({
+  queryKey: ["status"],
+  queryFn: async () => {
+    const response = await apiRequest("/status", "get", {});
+
+    if (response.status !== 200) {
+      throw failure(response);
+    }
+
+    return response.data;
+  },
+});

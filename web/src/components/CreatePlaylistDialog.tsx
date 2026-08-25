@@ -1,127 +1,74 @@
-import { FC, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { PlusIcon, Cross2Icon } from "@radix-ui/react-icons";
+import { type FC, useState } from "react";
+
 import { useCreatePlaylist } from "../hooks/useCreatePlaylist";
-import type { components } from "../api/schema.gen";
 
-type CreatePlaylistRequest = components["schemas"]["CreatePlaylistRequest"];
-
-interface CreatePlaylistDialogProps {
-  trigger?: React.ReactNode;
-}
-
-export const CreatePlaylistDialog: FC<CreatePlaylistDialogProps> = ({ trigger }) => {
+export const CreatePlaylistDialog: FC = () => {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<CreatePlaylistRequest>({
-    id: "",
-    name: "",
-    interval_seconds: 30,
-  });
+  const [playlistId, setPlaylistId] = useState("");
+  const [name, setName] = useState("");
+  const [interval, setInterval] = useState("1m");
 
-  const createPlaylistMutation = useCreatePlaylist({
-    onSuccess: () => {
-      setOpen(false);
-      setFormData({ id: "", name: "", interval_seconds: 30 });
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.id && formData.name) {
-      createPlaylistMutation.mutate(formData);
-    }
-  };
+  const create = useCreatePlaylist({ onSuccess: () => setOpen(false) });
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        {trigger || (
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors">
-            <PlusIcon className="w-4 h-4" />
-            Create Playlist
-          </button>
-        )}
+      <Dialog.Trigger className="bg-gray-800 px-3 py-1 text-sm text-gray-100 hover:bg-gray-700">
+        New playlist
       </Dialog.Trigger>
-
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 rounded-lg shadow-xl z-50 w-full max-w-md p-6 border border-gray-700">
-          <Dialog.Title className="text-lg font-semibold mb-4 text-gray-100">
-            Create New Playlist
-          </Dialog.Title>
+        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 w-[28rem] -translate-x-1/2 -translate-y-1/2 border border-gray-800 bg-gray-950 p-5">
+          <Dialog.Title className="mb-4 font-semibold text-gray-100">New playlist</Dialog.Title>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="playlist-id" className="block text-sm font-medium text-gray-300 mb-1">
-                Playlist ID
-              </label>
+          <fieldset className="flex flex-col gap-3">
+            <label className="text-sm text-gray-400">
+              Playlist id
               <input
-                id="playlist-id"
-                type="text"
-                value={formData.id}
-                onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                placeholder="unique-playlist-id"
-                required
+                value={playlistId}
+                onChange={event => setPlaylistId(event.target.value)}
+                placeholder="mission-display"
+                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
-            </div>
-
-            <div>
-              <label htmlFor="playlist-name" className="block text-sm font-medium text-gray-300 mb-1">
-                Display Name
-              </label>
+            </label>
+            <label className="text-sm text-gray-400">
+              Name
               <input
-                id="playlist-name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
-                placeholder="My Playlist"
-                required
+                value={name}
+                onChange={event => setName(event.target.value)}
+                placeholder="Mission Display"
+                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
-            </div>
-
-            <div>
-              <label htmlFor="interval" className="block text-sm font-medium text-gray-300 mb-1">
-                Interval (seconds)
-              </label>
+            </label>
+            <label className="text-sm text-gray-400">
+              Interval
               <input
-                id="interval"
-                type="number"
-                min="1"
-                value={formData.interval_seconds}
-                onChange={(e) => setFormData({ ...formData, interval_seconds: parseInt(e.target.value) || 30 })}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                value={interval}
+                onChange={event => setInterval(event.target.value)}
+                placeholder="1m"
+                className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
-            </div>
+              <span className="mt-1 block text-xs text-gray-600">
+                A duration such as 30s, 5m or 1h.
+              </span>
+            </label>
+          </fieldset>
 
-            <div className="flex justify-end gap-3 pt-4">
-              <Dialog.Close asChild>
-                <button
-                  type="button"
-                  className="px-4 py-2 text-gray-300 bg-gray-700 border border-gray-600 rounded-md hover:bg-gray-600 transition-colors"
-                >
-                  Cancel
-                </button>
-              </Dialog.Close>
-              <button
-                type="submit"
-                disabled={createPlaylistMutation.isPending}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {createPlaylistMutation.isPending ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </form>
-
-          <Dialog.Close asChild>
+          <div className="mt-5 flex justify-end gap-2">
+            <Dialog.Close className="px-3 py-1 text-sm text-gray-400">Cancel</Dialog.Close>
             <button
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-300"
-              aria-label="Close"
+              type="button"
+              onClick={() => create.mutate({
+                playlist_id: playlistId,
+                name: name || undefined,
+                interval,
+              })}
+              disabled={!playlistId || !interval}
+              className="bg-emerald-700 px-3 py-1 text-sm text-white disabled:opacity-50"
             >
-              <Cross2Icon className="w-5 h-5" />
+              Create
             </button>
-          </Dialog.Close>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

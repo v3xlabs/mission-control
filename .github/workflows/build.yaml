@@ -11,8 +11,8 @@ on:
 # Set up some global variables we'll use throughout
 env:
     REGISTRY: ghcr.io
-    IMAGE_NAME: v3xlabs/v3x-mission-control
-    BINARY_NAME: v3x-mission-control
+    IMAGE_NAME: v3xlabs/missiond
+    BINARY_NAME: missiond
     DOCKER_BUILDKIT: 1 # Enable BuildKit
     COMPOSE_DOCKER_CLI_BUILD: 1
 
@@ -56,11 +56,9 @@ jobs:
               working-directory: web
               run: pnpm build
 
-            # Copy web build to app/src/web for embedding
-            - name: Copy web build to app/src/web for embedding
-              run: |
-                  mkdir -p app/src/web
-                  cp -r web/dist/* app/src/web/
+            # The daemon embeds this directory. `just build` does the same copy locally.
+            - name: Stage the web build for embedding
+              run: cp -r web/dist daemon/web-dist
 
             # Set up Rust with the specific target we need
             - name: Install Rust
@@ -71,17 +69,17 @@ jobs:
               uses: Swatinem/rust-cache@v2
               with:
                   key: ${{ matrix.platform.arch }}
-                  workspaces: app
+                  workspaces: daemon
 
             # Install cross
             - name: Install cross
               run: cargo install cross
 
-            # Update version number in app/Cargo.toml
+            # Update version number in daemon/Cargo.toml
             # If tag is a release use that
-            # Otherwise use the version number in the app/Cargo.toml and append it with -alpha
+            # Otherwise use the version number in the daemon/Cargo.toml and append it with -alpha
             - name: Update version number
-              working-directory: app
+              working-directory: daemon
               run: |
                   if [[ "${{ github.ref }}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
                     VERSION=${GITHUB_REF#refs/tags/v}
@@ -96,7 +94,7 @@ jobs:
 
             # 🔨 Build our static binary
             - name: Build Rust binary
-              working-directory: app
+              working-directory: daemon
               env:
                   BINARY_NAME: ${{ env.BINARY_NAME }}
                   SQLX_OFFLINE: true # Use prepared SQL queries
@@ -106,8 +104,8 @@ jobs:
             - name: Upload built binary as artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: v3x-mission-control-${{ matrix.platform.arch }}
-                  path: app/target/${{ matrix.platform.arch }}/release/${{ env.BINARY_NAME }}
+                  name: missiond-${{ matrix.platform.arch }}
+                  path: daemon/target/${{ matrix.platform.arch }}/release/${{ env.BINARY_NAME }}
                   retention-days: 1 # Save storage by cleaning up quickly
                   compression-level: 9 # Maximum compression
 
@@ -128,13 +126,13 @@ jobs:
             - name: Download x86_64 binary
               uses: actions/download-artifact@v4
               with:
-                  name: v3x-mission-control-x86_64-unknown-linux-musl
+                  name: missiond-x86_64-unknown-linux-musl
                   path: ./x86_64
 
             - name: Download aarch64 binary
               uses: actions/download-artifact@v4
               with:
-                  name: v3x-mission-control-aarch64-unknown-linux-musl
+                  name: missiond-aarch64-unknown-linux-musl
                   path: ./aarch64
 
             # Create the release
