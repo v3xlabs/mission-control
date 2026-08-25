@@ -7,7 +7,10 @@ use poem_openapi::{
 
 use crate::state::AppState;
 
-use super::{ApiError, ApiResult, DeviceStatus};
+use super::{
+    auth::{is_authorized, Authorization},
+    ApiError, ApiResult, DeviceStatus,
+};
 
 pub struct StatusApi {
     pub state: Arc<AppState>,
@@ -17,7 +20,7 @@ pub struct StatusApi {
 impl StatusApi {
     /// What is on screen, and how the daemon is configured to persist changes.
     #[oai(path = "/status", method = "get")]
-    async fn status(&self) -> ApiResult<Json<DeviceStatus>> {
+    async fn status(&self, authorization: Authorization) -> ApiResult<Json<DeviceStatus>> {
         let device = self.state.config.read().await.device;
         let chrome = self.state.chrome.state.lock().await;
 
@@ -35,6 +38,8 @@ impl StatusApi {
                 .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|since| since.as_secs()),
             config_read_only: self.state.config.is_read_only(),
+            requires_auth: self.state.admin_key.is_some(),
+            authenticated: is_authorized(&self.state, &authorization),
         }))
     }
 

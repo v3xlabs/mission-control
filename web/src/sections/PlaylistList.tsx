@@ -3,6 +3,7 @@ import { type FC } from "react";
 import { usePlaylists } from "../api/playlists";
 import { CreatePlaylistDialog } from "../components/CreatePlaylistDialog";
 import { PlaylistCard } from "../components/PlaylistCard";
+import { ScreenPanel } from "../components/ScreenPanel";
 
 export const PlaylistList: FC = () => {
   const { data: playlists, isLoading, error } = usePlaylists();
@@ -21,6 +22,8 @@ export const PlaylistList: FC = () => {
         <h2 className="text-lg font-semibold text-gray-100">Playlists</h2>
         <CreatePlaylistDialog />
       </div>
+
+      <ScreenPanel />
 
       {playlists.length === 0
         ? <p className="text-gray-500">No playlists configured.</p>

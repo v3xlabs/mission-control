@@ -1,16 +1,15 @@
-import { type FC, useState } from "react";
+import { type FC } from "react";
 import { FiChevronLeft, FiChevronRight, FiMonitor, FiPause, FiPlay } from "react-icons/fi";
 
-import { adminKey, setAdminKey } from "../api/auth";
 import { useDisplayPower } from "../hooks/useDisplayPower";
 import { usePlayback } from "../hooks/usePlayback";
 import { useStatus } from "../hooks/useStatus";
+import { AdminKeyField } from "./AdminKeyField";
 
 export const StatusBar: FC = () => {
   const { data: status } = useStatus();
   const playback = usePlayback();
   const power = useDisplayPower();
-  const [key, setKey] = useState(adminKey());
 
   if (!status) {
     return <header className="border-b border-gray-800 px-4 py-3 text-gray-500">Connecting...</header>;
@@ -59,16 +58,7 @@ export const StatusBar: FC = () => {
         </button>
       </div>
 
-      <input
-        type="password"
-        value={key}
-        onChange={(event) => {
-          setKey(event.target.value);
-          setAdminKey(event.target.value);
-        }}
-        placeholder="admin key"
-        className="w-40 border border-gray-800 bg-gray-900 px-2 py-1 text-sm text-gray-100"
-      />
+      <AdminKeyField requiresAuth={status.requires_auth} authenticated={status.authenticated} />
     </header>
   );
 };

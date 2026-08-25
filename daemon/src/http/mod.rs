@@ -38,6 +38,7 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
             "/api/preview_live/:tab_id",
             get(preview_live).data(state.clone()),
         )
+        .at("/api/screen", get(screen).data(state.clone()))
         .at("/api/events", get(events).data(state.clone()))
         .nest("/api", api_service)
         .nest("/docs", ui)
@@ -72,6 +73,26 @@ fn not_found(message: &str) -> Response {
         .body(message.to_string())
 }
 
+/// What the compositor is putting on the panel, captured through its screencopy protocol rather
+/// than through the browser. Unlike a tab preview this includes anything drawn over the page.
+#[handler]
+async fn screen(state: Data<&Arc<AppState>>) -> impl IntoResponse {
+    let display = state.config.read().await.display;
+
+    match state.capture.grab(&display).await {
+        Ok(image) => Response::builder()
+            .content_type("image/jpeg")
+            .header("cache-control", "no-store")
+            .body(Body::from_bytes(image.into())),
+        Err(error) => Response::builder()
+            .status(StatusCode::SERVICE_UNAVAILABLE)
+            .body(error.to_string()),
+    }
+}
+
+/// How long the stream waits for a new frame before resending the last one.
+const HEARTBEAT: Duration = Duration::from_secs(2);
+
 #[handler]
 async fn preview_live(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl IntoResponse {
     const BOUNDARY: &str = "missiondframe";
@@ -81,21 +102,28 @@ async fn preview_live(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl
     };
 
     let stream = async_stream::stream! {
+        yield Ok::<_, std::io::Error>(format!("--{BOUNDARY}\r\n").into_bytes());
+
         loop {
             let frame = receiver.borrow_and_update().clone();
 
             if let Some(frame) = frame {
-                let header = format!(
-                    "--{BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
+                let part = format!(
+                    "Content-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
                     frame.len()
                 );
 
-                yield Ok::<_, std::io::Error>(header.into_bytes());
+                yield Ok::<_, std::io::Error>(part.into_bytes());
                 yield Ok(frame);
-                yield Ok(b"\r\n".to_vec());
+                // The trailing boundary goes out with the frame rather than waiting for the next
+                // one. A part is only complete once the following boundary arrives, so a tab that
+                // produces one frame and then stops would otherwise never render at all.
+                yield Ok(format!("\r\n--{BOUNDARY}\r\n").into_bytes());
             }
 
-            if receiver.changed().await.is_err() {
+            // Chromium commits a part only once another one follows it, so a tab whose page has
+            // stopped repainting needs the last frame sent again to appear at all.
+            if let Ok(Err(_)) = tokio::time::timeout(HEARTBEAT, receiver.changed()).await {
                 break;
             }
         }

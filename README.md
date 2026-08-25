@@ -40,6 +40,7 @@ for the schema.
     enable = true;
     user = "display";
     host = "0.0.0.0";
+    port = 3000;
     openFirewall = true;
     adminKeyFile = config.sops.secrets.missiond_admin_key.path;
 

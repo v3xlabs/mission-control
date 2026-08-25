@@ -29,6 +29,7 @@ in
       pnpm_11
       chromium
       cage
+      grim
       ddcutil
       pkg-config
     ];

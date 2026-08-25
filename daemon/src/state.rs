@@ -6,7 +6,7 @@ use crate::{
     chrome::ChromeController,
     config::{ConfigStore, Dirs},
     db::Runtime,
-    display::Display,
+    display::{capture::OutputCapture, Display},
     events::Events,
     hass::HassManager,
 };
@@ -17,6 +17,7 @@ pub struct AppState {
     pub chrome: Arc<ChromeController>,
     pub config: Arc<ConfigStore>,
     pub display: Arc<Display>,
+    pub capture: Arc<OutputCapture>,
     pub events: Arc<Events>,
     pub hass: Arc<HassManager>,
     pub runtime: Runtime,
@@ -39,16 +40,21 @@ impl AppState {
 
         let hass = HassManager::new(&device).await?;
 
-        Ok(Arc::new(Self {
+        let state = Arc::new(Self {
             chrome: Arc::new(ChromeController::new()),
             config,
             display: Arc::new(Display::new()),
+            capture: Arc::new(OutputCapture::new()),
             events: Arc::new(Events::new()),
             hass: Arc::new(hass),
             runtime,
             admin_key,
             started_at: std::time::Instant::now(),
-        }))
+        });
+
+        state.events.publish(&state).await;
+
+        Ok(state)
     }
 
     pub fn uptime_seconds(&self) -> u64 {

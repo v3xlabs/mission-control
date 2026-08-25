@@ -10,6 +10,7 @@ import { useRecreateTab } from "../hooks/useRecreateTab";
 import { useRefreshTab } from "../hooks/useRefreshTab";
 import { useRemoveTabFromPlaylist } from "../hooks/useRemoveTabFromPlaylist";
 import { useSetTabEnabled } from "../hooks/useSetTabEnabled";
+import { TabPreview } from "./TabPreview";
 
 type TabInfo = components["schemas"]["TabInfo"];
 
@@ -76,12 +77,7 @@ export const TabCard: FC<Properties> = ({ tab, playlistId, isOnScreen }) => {
         className="relative block aspect-video w-full overflow-hidden bg-gray-900"
         title="Put this tab on screen"
       >
-        {/* Subscribing starts the capture; closing this page stops it again. */}
-        <img
-          src={`/api/preview_live/${tab.tab_id}`}
-          alt=""
-          className="h-full w-full object-cover"
-        />
+        <TabPreview tabId={tab.tab_id} />
         {isOnScreen && (
           <span className="absolute top-1 left-1 bg-emerald-600 px-1.5 py-0.5 text-xs text-white">
             on screen

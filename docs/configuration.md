@@ -58,7 +58,7 @@ file = "/run/secrets/missiond_admin_key"
 
 [chromium]
 enabled = true
-fullscreen = false
+fullscreen = true
 binary_path = "/run/current-system/sw/bin/chromium"
 extra_args = ["--force-dark-mode"]
 
@@ -75,18 +75,29 @@ password = { env = "MISSIOND_MQTT_PASSWORD" }
 | `http.host`, `http.port` | string, integer | Where the API and web UI listen. Defaults are `0.0.0.0` and `3000`. |
 | `admin_key` | secret, optional | Required on every mutating request as `authorization: Bearer <key>`. Without one, anything that can reach the port can change the display. |
 | `chromium.enabled` | boolean | A disabled browser leaves the API and web UI running, which is how the daemon is tested without a compositor. |
-| `chromium.fullscreen` | boolean | Defaults to `false`. See below. |
+| `chromium.fullscreen` | boolean | Defaults to `true`. See below. |
 | `chromium.binary_path` | string, optional | Falls back to `$CHROMIUM_BINARY`, then to `chromium` on `PATH`. |
 | `chromium.extra_args` | array | Appended to the argument list. |
 | `homeassistant` | table, optional | Omit it and MQTT stays off. |
 
 ### fullscreen
 
-`fullscreen = true` passes `--kiosk`, and the browser covers the output.
+Defaults to `true`, which passes `--kiosk`. The browser covers the output and draws none of its
+own interface: no tab strip, no omnibox, no profile button.
 
-The default is `false`, which starts a maximised window the compositor tiles. A full-screen window
-is not subject to the space a layer surface reserves, so a reserved overlay sidebar only works
-with a tiled window. On niri, hide the decorations with a window rule.
+Setting it to `false` starts a maximised window the compositor tiles instead. A full-screen window
+is not subject to the space a layer surface reserves, so a reserved overlay sidebar will need this
+off. It is off by default only once something draws overlays, because a tiled window on niri opens
+at its column width, which is half the screen, and shows the browser's full interface. If you turn
+it off today, add a niri window rule:
+
+```kdl
+window-rule {
+    match app-id="chromium-browser"
+    open-maximized true
+    draw-border-with-background false
+}
+```
 
 ## display.toml
 
@@ -97,8 +108,7 @@ output = "DP-1"
 power_on  = ["niri", "msg", "action", "power-on-monitors"]
 power_off = ["niri", "msg", "action", "power-off-monitors"]
 brightness = ["ddcutil", "setvcp", "10", "{percent}", "--display", "1"]
-
-idle_timeout = "20m"
+screenshot = ["grim", "-t", "jpeg", "-q", "80", "-"]
 
 [[schedule]]
 days = ["mon", "tue", "wed", "thu", "fri"]
@@ -115,7 +125,7 @@ substituted. The defaults are the niri commands above.
 | `output` | string, optional | Substituted for `{output}`. |
 | `power_on`, `power_off` | array | Argument vectors, not shell strings. |
 | `brightness` | array | Receives `{percent}` from 0 through 100. |
-| `idle_timeout` | duration, optional | How long before the screen sleeps inside an on window. |
+| `screenshot` | array | Writes the output's current contents to stdout. The default uses `grim`, which speaks wlr-screencopy. |
 | `schedule` | array of tables | Weekly windows during which the screen is on. |
 
 A window whose `to` is earlier than its `from` runs past midnight. A day with no window is off.
@@ -243,3 +253,16 @@ screen shows nothing. The rotation fixes that within one cycle.
 
 A tab that is not on screen and that no browser is watching stops capturing. Opening the web UI
 starts it again, so an unattended display does no JPEG encoding for tabs nobody can see.
+
+## The screen, as opposed to a tab
+
+`GET /api/screen` returns what the compositor is putting on the panel, captured through its own
+screencopy protocol rather than through the browser. It includes anything drawn over the page,
+which a tab preview cannot show.
+
+It runs the `screenshot` command from `display.toml` and nothing else: no background process, no
+stream. Repeated requests inside one second reuse the last capture, so holding the page open
+cannot spawn a capture per frame.
+
+The default command is `grim`, which needs to be on the daemon's PATH. Under the NixOS module,
+add it to `extraPackages`.

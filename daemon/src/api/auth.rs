@@ -6,9 +6,9 @@ use super::{ApiError, ApiResult};
 
 pub type Authorization = Header<Option<String>>;
 
-pub fn authorize(state: &AppState, presented: &Authorization) -> ApiResult<()> {
+pub fn is_authorized(state: &AppState, presented: &Authorization) -> bool {
     let Some(expected) = state.admin_key.as_deref() else {
-        return Ok(());
+        return true;
     };
 
     let presented = presented
@@ -17,7 +17,11 @@ pub fn authorize(state: &AppState, presented: &Authorization) -> ApiResult<()> {
         .and_then(|value| value.strip_prefix("Bearer "))
         .unwrap_or_default();
 
-    if constant_time_eq(presented.as_bytes(), expected.as_bytes()) {
+    constant_time_eq(presented.as_bytes(), expected.as_bytes())
+}
+
+pub fn authorize(state: &AppState, presented: &Authorization) -> ApiResult<()> {
+    if is_authorized(state, presented) {
         Ok(())
     } else {
         Err(ApiError::unauthorized())

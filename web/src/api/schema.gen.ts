@@ -15,7 +15,9 @@ export interface paths {
         get: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    authorization?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -1683,11 +1685,13 @@ export interface components {
             /** @description True when the config directory is managed elsewhere, so a change made here applies now
              *     but does not survive a restart. */
             config_read_only: boolean;
+            /** @description Whether an admin key is configured at all. False means every mutation is open. */
+            requires_auth: boolean;
+            /** @description Whether the key this request carried was accepted. Lets the web UI show that a mutation
+             *     will be refused before the reader clicks it. */
+            authenticated: boolean;
         };
-        /**
-         * ErrorBody
-         * @description What every failure answers with. The API never returns HTTP 200 carrying an error.
-         */
+        /** ErrorBody */
         ErrorBody: {
             message: string;
         };

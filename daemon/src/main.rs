@@ -35,8 +35,6 @@ async fn main() -> Result<()> {
         info!("config directory is read-only: changes apply until restart only");
     }
 
-    state.events.publish(&state).await;
-
     if state.config.read().await.device.chromium.enabled {
         let controller = state.chrome.clone();
         let started = state.clone();

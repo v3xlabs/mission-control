@@ -52,12 +52,6 @@
         default = ["ddcutil" "setvcp" "10" "{percent}"];
         description = "Command that sets panel brightness. `{percent}` is substituted.";
       };
-      idle_timeout = lib.mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        example = "20m";
-        description = "How long without input before the screen sleeps inside an on window.";
-      };
       schedule = lib.mkOption {
         type = types.listOf scheduleWindow;
         default = [];
@@ -152,7 +146,12 @@ in {
     extraPackages = lib.mkOption {
       type = types.listOf types.package;
       default = [];
-      description = "Extra packages on the daemon's PATH, for the display commands it runs.";
+      example = lib.literalExpression "[config.programs.niri.package pkgs.ddcutil pkgs.grim]";
+      description = ''
+        Extra packages on the daemon's PATH. The display commands are run by name, and a systemd
+        unit inherits no PATH of its own, so niri, ddcutil and grim have to be listed here for
+        screen power, brightness and the screen capture to work.
+      '';
     };
 
     configDir = lib.mkOption {

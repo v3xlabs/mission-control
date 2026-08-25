@@ -15,4 +15,9 @@ pub struct DeviceStatus {
     /// True when the config directory is managed elsewhere, so a change made here applies now
     /// but does not survive a restart.
     pub config_read_only: bool,
+    /// Whether an admin key is configured at all. False means every mutation is open.
+    pub requires_auth: bool,
+    /// Whether the key this request carried was accepted. Lets the web UI show that a mutation
+    /// will be refused before the reader clicks it.
+    pub authenticated: bool,
 }

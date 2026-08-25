@@ -1,3 +1,4 @@
+pub mod capture;
 pub mod schedule;
 
 use std::{
@@ -72,7 +73,7 @@ impl Display {
     }
 }
 
-fn substitute(template: &[String], output: Option<&str>, percent: Option<u32>) -> Vec<String> {
+pub(super) fn substitute(template: &[String], output: Option<&str>, percent: Option<u32>) -> Vec<String> {
     template
         .iter()
         .map(|part| {
