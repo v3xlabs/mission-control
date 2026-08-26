@@ -20,6 +20,7 @@ pub mod events;
 pub mod hass;
 pub mod http;
 pub mod notifications;
+pub mod player;
 pub mod state;
 
 #[tokio::main]
@@ -75,6 +76,9 @@ async fn main() -> Result<()> {
     if let Err(error) = tell(&state.chrome, ChromeMessage::Shutdown).await {
         warn!("failed to shut the browser down cleanly: {error}");
     }
+
+    state.player.shutdown().await;
+    state.sidebar.hide().await;
 
     Ok(())
 }

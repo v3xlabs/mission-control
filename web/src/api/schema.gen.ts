@@ -1656,6 +1656,284 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Raise an alert. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["NotifyRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stingers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The configured clips, so the transition page can resolve a name to a file. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["StingerInfo"][];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everything currently showing. The alert pages read this. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["Notification"][];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notification_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Clear one early. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path: {
+                    notification_id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["MutationResult"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1696,12 +1974,59 @@ export interface components {
             message: string;
         };
         /**
+         * @description How loudly an alert asks to be looked at.
+         * @enum {string}
+         */
+        Level: "info" | "warning" | "critical";
+        /**
          * MutationResult
          * @description What a mutation answers with. `persisted` is false when the config directory is managed
          *     elsewhere, so the change applies to the running display and lasts until the next restart.
          */
         MutationResult: {
             persisted: boolean;
+        };
+        /** Notification */
+        Notification: {
+            /** Format: uint64 */
+            notification_id: number;
+            title: string;
+            body?: string;
+            level: components["schemas"]["Level"];
+            mode: components["schemas"]["NotificationMode"];
+            /**
+             * Format: uint64
+             * @description Seconds from now until it expires, so a page can count down without a shared clock.
+             */
+            expires_in_seconds: number;
+            /** @description A tab to put on screen instead of a message card. This is what turns a doorbell alert into
+             *     the camera feed rather than the word "doorbell". */
+            tab_id?: string;
+            /** @description A clip played while the alert arrives, by name from `notifications.toml`. */
+            stinger?: string;
+        };
+        /**
+         * @description How an alert reaches the screen.
+         * @enum {string}
+         */
+        NotificationMode: "takeover" | "sidebar";
+        /**
+         * NotifyRequest
+         * @description One endpoint everything can reach: a Home Assistant automation, a Stream Deck key, a CI job.
+         */
+        NotifyRequest: {
+            title: string;
+            body?: string;
+            level?: components["schemas"]["Level"];
+            /** @description Overrides `mode` from `notifications.toml` for this one alert. */
+            mode?: components["schemas"]["NotificationMode"] & unknown;
+            /** @description A duration such as `20s`. Falls back to the configured default. */
+            duration?: string;
+            /** @description Show this tab rather than a message card, which is what turns a doorbell alert into the
+             *     camera feed instead of the word "doorbell". */
+            tab_id?: string;
+            /** @description A clip to cover the change, by name from `notifications.toml`. */
+            stinger?: string;
         };
         /** PlaylistInfo */
         PlaylistInfo: {
@@ -1731,11 +2056,22 @@ export interface components {
         SetEnabledRequest: {
             enabled: boolean;
         };
+        /**
+         * StingerInfo
+         * @description What the transition page needs: which file to play for a given name. The configured duration
+         *     stays on the daemon, which is what decides how long the page is up.
+         */
+        StingerInfo: {
+            name: string;
+            file: string;
+        };
         /** TabInfo */
         TabInfo: {
             tab_id: string;
             name: string;
-            url: string;
+            /** @description The page address. Absent for a camera, whose stream url is a credential and never leaves
+             *     the daemon. */
+            url?: string;
             /** Format: uint64 */
             order_index: number;
             persist: boolean;
@@ -1745,13 +2081,19 @@ export interface components {
             /** Format: int32 */
             viewport_height?: number;
         };
-        /** UpsertTabRequest */
+        /**
+         * UpsertTabRequest
+         * @description A tab created through the API is always a page. A camera stream url carries a credential, so
+         *     it is declared in the config directory rather than posted in and written back to disk.
+         */
         UpsertTabRequest: {
             name?: string;
             url: string;
             persist?: boolean;
             /** Format: double */
             scale?: number;
+            /** @description A stinger played while this tab loads, by name from `notifications.toml`. */
+            stinger?: string;
         };
     };
     responses: never;

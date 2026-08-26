@@ -1,8 +1,10 @@
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-use crate::config::Tab;
+use crate::config::{Source, Tab};
 
+/// A tab created through the API is always a page. A camera stream url carries a credential, so
+/// it is declared in the config directory rather than posted in and written back to disk.
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct UpsertTabRequest {
     pub name: Option<String>,
@@ -18,7 +20,7 @@ impl UpsertTabRequest {
         Tab {
             tab_id,
             name: self.name,
-            url: self.url,
+            source: Source::Url(self.url),
             persist: self.persist.unwrap_or(true),
             scale: self.scale,
             stinger: self.stinger,

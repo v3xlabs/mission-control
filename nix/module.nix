@@ -82,6 +82,7 @@
           inherit (cfg) host port;
         };
         chromium = cfg.settings.chromium;
+        mpv = cfg.settings.mpv;
       }
       // lib.optionalAttrs (cfg.adminKeyFile != null) {
         admin_key.file = cfg.adminKeyFile;
@@ -155,11 +156,11 @@ in {
     extraPackages = lib.mkOption {
       type = types.listOf types.package;
       default = [];
-      example = lib.literalExpression "[config.programs.niri.package pkgs.ddcutil pkgs.grim]";
+      example = lib.literalExpression "[config.programs.niri.package pkgs.ddcutil pkgs.grim pkgs.mpv]";
       description = ''
         Extra packages on the daemon's PATH. The display commands are run by name, and a systemd
         unit inherits no PATH of its own, so niri, ddcutil and grim have to be listed here for
-        screen power, brightness and the screen capture to work.
+        screen power, brightness and the screen capture to work, and mpv for a camera tab.
       '';
     };
 
@@ -195,6 +196,20 @@ in {
             description = ''
               Browser settings. `fullscreen` defaults to true, which covers the output and hides
               the browser's own interface. Turning it off leaves a window the compositor tiles.
+            '';
+          };
+
+          mpv = lib.mkOption {
+            type = passthrough;
+            default = {};
+            example = lib.literalExpression ''
+              {
+                extra_args = ["--hwdec=auto-safe"];
+              }
+            '';
+            description = ''
+              The player that draws camera tabs. mpv has to be in `extraPackages` for a camera to
+              work at all.
             '';
           };
 

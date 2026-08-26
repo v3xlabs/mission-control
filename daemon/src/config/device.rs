@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{version, ChromiumConfig, HomeAssistantConfig, HttpConfig, SecretRef};
+use super::{version, ChromiumConfig, HomeAssistantConfig, HttpConfig, MpvConfig, SecretRef};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DeviceDocument {
@@ -14,6 +14,8 @@ pub struct DeviceDocument {
     pub admin_key: Option<SecretRef>,
     #[serde(default)]
     pub chromium: ChromiumConfig,
+    #[serde(default)]
+    pub mpv: MpvConfig,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homeassistant: Option<HomeAssistantConfig>,
 }
@@ -27,6 +29,7 @@ impl Default for DeviceDocument {
             http: HttpConfig::default(),
             admin_key: None,
             chromium: ChromiumConfig::default(),
+            mpv: MpvConfig::default(),
             homeassistant: None,
         }
     }

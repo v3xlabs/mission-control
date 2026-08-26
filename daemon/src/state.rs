@@ -10,6 +10,7 @@ use crate::{
     events::Events,
     hass::HassManager,
     notifications::{Notifications, Sidebar},
+    player::Player,
 };
 
 pub type State = Arc<AppState>;
@@ -22,6 +23,7 @@ pub struct AppState {
     pub events: Arc<Events>,
     pub notifications: Arc<Notifications>,
     pub sidebar: Arc<Sidebar>,
+    pub player: Arc<Player>,
     pub hass: Arc<HassManager>,
     pub runtime: Runtime,
     pub admin_key: Option<String>,
@@ -42,6 +44,7 @@ impl AppState {
         };
 
         let hass = HassManager::new(&device).await?;
+        let player = Arc::new(Player::new(&config.dirs.state));
 
         let state = Arc::new(Self {
             chrome: Arc::new(ChromeController::new()),
@@ -51,6 +54,7 @@ impl AppState {
             events: Arc::new(Events::new()),
             notifications: Arc::new(Notifications::new()),
             sidebar: Arc::new(Sidebar::new()),
+            player,
             hass: Arc::new(hass),
             runtime,
             admin_key,

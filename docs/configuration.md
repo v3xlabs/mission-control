@@ -62,6 +62,10 @@ fullscreen = true
 binary_path = "/run/current-system/sw/bin/chromium"
 extra_args = ["--force-dark-mode"]
 
+[mpv]
+binary_path = "/run/current-system/sw/bin/mpv"
+extra_args = ["--hwdec=auto-safe"]
+
 [homeassistant]
 mqtt_url = "mqtt://broker.example:1883"
 username = "missiond"
@@ -78,6 +82,8 @@ password = { env = "MISSIOND_MQTT_PASSWORD" }
 | `chromium.fullscreen` | boolean | Defaults to `true`. See below. |
 | `chromium.binary_path` | string, optional | Falls back to `$CHROMIUM_BINARY`, then to `chromium` on `PATH`. |
 | `chromium.extra_args` | array | Appended to the argument list. |
+| `mpv.binary_path` | string, optional | Falls back to `$MPV_BINARY`, then to `mpv` on `PATH`. Only camera tabs use it. |
+| `mpv.extra_args` | array | Appended to the argument list. |
 | `homeassistant` | table, optional | Omit it and MQTT stays off. |
 
 ### fullscreen
@@ -157,9 +163,51 @@ scale = 1.25
 | --- | --- | --- |
 | `tab_id` | string | The identity. A playlist references it, and changing it orphans those references. |
 | `name` | string, optional | Web UI label. Defaults to `tab_id`. |
-| `url` | string | What the page loads. |
+| `url` | string | What the page loads. A tab has this or `rtsp`, never both. |
+| `rtsp` | secret, optional | A camera stream. The whole url is treated as a secret, because the credential is part of it. |
 | `persist` | boolean | Whether the page stays loaded when the playlist moves on. Defaults to `true`. |
 | `scale` | float, optional | Device scale factor for this page only, so a dashboard and a departure board can differ on the same panel. |
+| `stinger` | string, optional | A clip played while this tab loads, by name from `notifications.toml`. |
+
+### Cameras
+
+A browser has no `rtsp://` handler, so a camera is not a page. missiond plays it with mpv in its
+own window, and the compositor puts that window over the browser. Everything else about a camera
+is an ordinary tab: it sits in a playlist, it rotates, and an alert can take over with it.
+
+```toml
+[[tabs]]
+tab_id = "front-door"
+name = "Front door"
+stinger = "doorbell"
+
+[tabs.rtsp]
+file = "/run/secrets/front-door-rtsp-url"
+```
+
+The file holds the whole url on one line, credential included:
+
+```
+rtsp://admin:hunter2@10.0.0.40:554/stream1
+```
+
+`env = "NAME"` reads it from the environment instead. An inline string works and is what a test
+uses, but it puts a credential in the config file.
+
+missiond hands the url to mpv over a control socket rather than as an argument, so it does not
+appear in the process list. It never reaches the web UI, Home Assistant or a log line either: the
+API reports a camera by leaving `url` out.
+
+Two consequences follow from a camera being outside the browser. `GET /api/preview/:tab_id` has
+no frame for one, because previews come from the browser's own protocol, while `GET /api/screen`
+still shows it, because that reads the compositor. And `POST /api/tabs` cannot create one: a
+stream url is a credential, and the API writes what it is given back to disk.
+
+mpv has to be on the daemon's PATH. Under the NixOS module that means `extraPackages`. The window
+carries the app id `missiond-camera`, so a compositor rule can match it.
+
+A camera that drops leaves its last frame on the wall rather than closing its window, which would
+put whatever page is behind it on screen instead.
 
 ## playlists.toml
 
@@ -335,6 +383,10 @@ services.missiond.settings = {
 ```
 
 The file has to be in the git tree of the flake it is referenced from, or Nix cannot see it.
+
+For a camera the clip plays first and the stream connects after it, rather than the two
+overlapping. mpv connects in well under the time a browser needs to load a camera page, so there
+is little left to cover.
 
 ### Raising an alert
 

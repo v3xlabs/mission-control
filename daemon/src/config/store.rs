@@ -214,7 +214,7 @@ fn write_document<T: Serialize>(base: &Path, document: Document, value: &T) -> R
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::Source, *};
 
     fn store_over(dir: &Path) -> ConfigStore {
         store_in_mode(dir, false)
@@ -306,13 +306,13 @@ url = "https://example.com/one"
         let store = store_in_mode(&dir, true);
         let persisted = store
             .mutate(Document::Tabs, |config| {
-                config.tabs.tabs[0].url = "https://example.com/two".to_string();
+                config.tabs.tabs[0].source = Source::Url("https://example.com/two".to_string());
             })
             .await
             .unwrap();
 
         assert_eq!(persisted, Persisted::MemoryOnly);
-        assert_eq!(store.tabs().await[0].url, "https://example.com/two");
+        assert_eq!(store.tabs().await[0].source.describe(), "https://example.com/two");
         assert!(std::fs::read_to_string(dir.join("tabs.toml"))
             .unwrap()
             .contains("example.com/one"));

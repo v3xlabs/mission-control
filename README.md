@@ -44,6 +44,9 @@ for the schema.
     openFirewall = true;
     adminKeyFile = config.sops.secrets.missiond_admin_key.path;
 
+    # The daemon runs commands and players by name, and a systemd unit inherits no PATH.
+    extraPackages = [config.programs.niri.package pkgs.ddcutil pkgs.grim pkgs.mpv];
+
     settings = {
       name = "Lobby Display";
       device_id = "lobby-display";
@@ -59,8 +62,9 @@ for the schema.
 
       tabs.grafana-overview.url = "http://127.0.0.1:3001/d/mission-overview?kiosk";
 
+      # A camera is played by mpv outside the browser, which is why mpv is in extraPackages.
       tabs.front-door = {
-        url = "http://camera.example/stream";
+        rtsp.file = config.sops.secrets.front_door_rtsp_url.path;
         stinger = "doorbell";
       };
 

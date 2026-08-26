@@ -21,7 +21,7 @@ use tokio::sync::{mpsc, watch, Mutex};
 use tracing::{error, info, warn};
 
 use crate::{
-    config::{ChromiumConfig, Tab},
+    config::{ChromiumConfig, Source, Tab},
     state::AppState,
 };
 
@@ -425,7 +425,13 @@ impl ChromeController {
             )
             .await;
 
-        for tab in tabs.iter().filter(|tab| tab.persist) {
+        // A camera has nothing to preload. It is connected when it comes on screen, because a
+        // stream nobody is watching is bandwidth off the camera for no reason.
+        let pages = tabs
+            .iter()
+            .filter(|tab| tab.persist && matches!(tab.source, Source::Url(_)));
+
+        for tab in pages {
             if !self.pages.lock().await.contains_key(&tab.tab_id) {
                 if let Err(error) = self.create_tab_page(tab).await {
                     warn!("failed to preload tab {}: {error}", tab.tab_id);
@@ -446,28 +452,41 @@ impl ChromeController {
         playlist_id: &str,
         app_state: &Arc<AppState>,
     ) -> Result<()> {
-        // An open page is enough to bring forward. The alert and transition pages are opened by
-        // the daemon rather than declared in `tabs.toml`, so requiring a config entry here would
-        // make them impossible to show.
-        if !self.pages.lock().await.contains_key(tab_id) {
-            let tab = app_state
-                .config
-                .tab(tab_id)
-                .await
-                .ok_or_else(|| anyhow!("tab {tab_id} not found"))?;
+        let tab = app_state.config.tab(tab_id).await;
 
-            self.create_tab_page(&tab).await?;
+        match tab.as_ref().map(|tab| &tab.source) {
+            Some(Source::Rtsp(stream)) => {
+                let mpv = app_state.config.read().await.device.mpv;
+
+                app_state.player.show(tab_id, stream, &mpv).await?;
+            }
+            _ => {
+                // An open page is enough to bring forward. The alert and transition pages are
+                // opened by the daemon rather than declared in `tabs.toml`, so requiring a config
+                // entry here would make them impossible to show.
+                if !self.pages.lock().await.contains_key(tab_id) {
+                    let tab = tab
+                        .as_ref()
+                        .ok_or_else(|| anyhow!("tab {tab_id} not found"))?;
+
+                    self.create_tab_page(tab).await?;
+                }
+
+                let page = self
+                    .pages
+                    .lock()
+                    .await
+                    .get(tab_id)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("no page for tab {tab_id}"))?;
+
+                // The camera window sits over the browser, so a page can only come forward once
+                // that window is gone.
+                app_state.player.hide().await;
+
+                page.bring_to_front().await?;
+            }
         }
-
-        let page = self
-            .pages
-            .lock()
-            .await
-            .get(tab_id)
-            .cloned()
-            .ok_or_else(|| anyhow!("no page for tab {tab_id}"))?;
-
-        page.bring_to_front().await?;
 
         let previous = {
             let mut state = self.state.lock().await;
@@ -489,8 +508,8 @@ impl ChromeController {
 
         app_state.hass.publish_tab_options(&tabs, Some(tab_id)).await;
 
-        if let Some(tab) = app_state.config.tab(tab_id).await {
-            app_state.hass.publish_url(&tab.url).await;
+        if let Some(tab) = tab {
+            app_state.hass.publish_url(tab.source.describe()).await;
         }
 
         app_state.events.publish(app_state).await;
@@ -584,10 +603,10 @@ impl ChromeController {
             let alert = Tab {
                 tab_id: ALERT_TAB.to_string(),
                 name: None,
-                url: self.own_url(app_state, "notify.html").await,
                 persist: false,
                 scale: None,
                 stinger: None,
+                source: Source::Url(self.own_url(app_state, "notify.html").await),
             };
 
             if let Err(error) = self.recreate_from(&alert).await {
@@ -606,6 +625,12 @@ impl ChromeController {
 
             return;
         };
+
+        // A camera has no page to open ahead of the clip. It connects when it is activated, which
+        // for a camera is fast enough that the clip has nothing to cover.
+        if matches!(tab.source, Source::Rtsp(_)) {
+            return;
+        }
 
         if let Err(error) = self.create_tab_page(&tab).await {
             warn!("failed to open {tab_id} for a takeover: {error}");
@@ -632,10 +657,10 @@ impl ChromeController {
         let tab = Tab {
             tab_id: STINGER_TAB.to_string(),
             name: None,
-            url: self.own_url(app_state, &format!("stinger.html?name={name}")).await,
             persist: false,
             scale: None,
             stinger: None,
+            source: Source::Url(self.own_url(app_state, &format!("stinger.html?name={name}")).await),
         };
 
         if let Err(error) = self.recreate_from(&tab).await {
@@ -687,11 +712,15 @@ impl ChromeController {
     }
 
     async fn create_tab_page(&self, tab: &Tab) -> Result<()> {
+        let Source::Url(url) = &tab.source else {
+            return Err(anyhow!("tab {} is a camera and has no page", tab.tab_id));
+        };
+
         let page = {
             let browser = self.browser.lock().await;
             let browser = browser.as_ref().ok_or_else(|| anyhow!("browser not ready"))?;
 
-            browser.new_page(tab.url.as_str()).await?
+            browser.new_page(url.as_str()).await?
         };
 
         if self.fullscreen.load(Ordering::Relaxed) {

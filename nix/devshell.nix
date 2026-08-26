@@ -28,6 +28,7 @@ in
       nodejs_24
       pnpm_11
       chromium
+      mpv
       cage
       grim
       ddcutil
@@ -35,6 +36,7 @@ in
     ];
 
     CHROMIUM_BINARY = "${pkgs.chromium}/bin/chromium";
+    MPV_BINARY = "${pkgs.mpv}/bin/mpv";
 
     shellHook = ''
       just

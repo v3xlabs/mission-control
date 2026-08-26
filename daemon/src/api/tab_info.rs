@@ -1,13 +1,18 @@
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-use crate::{chrome::ChromeController, config::Tab};
+use crate::{
+    chrome::ChromeController,
+    config::{Source, Tab},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct TabInfo {
     pub tab_id: String,
     pub name: String,
-    pub url: String,
+    /// The page address. Absent for a camera, whose stream url is a credential and never leaves
+    /// the daemon.
+    pub url: Option<String>,
     pub order_index: usize,
     pub persist: bool,
     pub enabled: bool,
@@ -30,7 +35,10 @@ impl TabInfo {
         Self {
             tab_id: tab.tab_id.clone(),
             name: tab.display_name().to_string(),
-            url: tab.url.clone(),
+            url: match &tab.source {
+                Source::Url(url) => Some(url.clone()),
+                Source::Rtsp(_) => None,
+            },
             order_index,
             persist: tab.persist,
             enabled,

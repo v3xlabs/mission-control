@@ -55,7 +55,7 @@ export const TabCard: FC<Properties> = ({ tab, playlistId, isOnScreen }) => {
         </button>
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-medium text-gray-100">{tab.name}</h3>
-          <p className="truncate text-xs text-gray-500">{tab.url}</p>
+          <p className="truncate text-xs text-gray-500">{tab.url ?? "camera"}</p>
         </div>
         <Switch.Root
           checked={tab.enabled}
@@ -77,7 +77,13 @@ export const TabCard: FC<Properties> = ({ tab, playlistId, isOnScreen }) => {
         className="relative block aspect-video w-full overflow-hidden bg-gray-900"
         title="Put this tab on screen"
       >
-        <TabPreview tabId={tab.tab_id} />
+        {tab.url === undefined
+          ? (
+              <span className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs text-gray-500">
+                a camera is played outside the browser and has no preview
+              </span>
+            )
+          : <TabPreview tabId={tab.tab_id} />}
         {isOnScreen && (
           <span className="absolute top-1 left-1 bg-emerald-600 px-1.5 py-0.5 text-xs text-white">
             on screen
@@ -86,15 +92,19 @@ export const TabCard: FC<Properties> = ({ tab, playlistId, isOnScreen }) => {
       </button>
 
       <div className="flex items-center gap-3 text-gray-400">
-        <button type="button" onClick={() => refresh.mutate(tab.tab_id)} title="Reload the page">
-          <FiRefreshCw />
-        </button>
-        <button type="button" onClick={() => recreate.mutate(tab.tab_id)} title="Close and reopen the page">
-          <FiRotateCw />
-        </button>
-        <a href={tab.url} target="_blank" rel="noreferrer" title="Open in this browser">
-          <FiExternalLink />
-        </a>
+        {tab.url !== undefined && (
+          <>
+            <button type="button" onClick={() => refresh.mutate(tab.tab_id)} title="Reload the page">
+              <FiRefreshCw />
+            </button>
+            <button type="button" onClick={() => recreate.mutate(tab.tab_id)} title="Close and reopen the page">
+              <FiRotateCw />
+            </button>
+            <a href={tab.url} target="_blank" rel="noreferrer" title="Open in this browser">
+              <FiExternalLink />
+            </a>
+          </>
+        )}
         <span className="flex-1" />
         <button
           type="button"
