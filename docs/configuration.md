@@ -368,8 +368,12 @@ profile, so it cannot disturb the display's.
 ### Stingers
 
 A stinger is a clip played while the screen changes. It is not decoration. A camera feed takes
-seconds to connect, and a viewer watching a blank page reads that as broken. The target starts
-loading first, the clip covers the wait, and the switch happens behind it.
+seconds to connect, and a viewer watching a blank page reads that as broken. The clip goes up
+first, the target comes to life behind it, and the clip is taken away once the target is there.
+
+The clip is a window of its own, played by mpv and floated over the display, rather than a page in
+the browser. A page has a background where the stream should be, and the browser cannot draw over
+a window it does not own.
 
 ```toml
 [[tabs]]
@@ -398,9 +402,41 @@ services.missiond.settings = {
 
 The file has to be in the git tree of the flake it is referenced from, or Nix cannot see it.
 
-For a camera the clip plays first and the stream connects after it, rather than the two
-overlapping. mpv connects in well under the time a browser needs to load a camera page, so there
-is little left to cover.
+#### Transparency
+
+A clip with an alpha channel shows the display coming up through it, which is the point of playing
+one over a camera rather than in front of it. Two things have to be true for that to work.
+
+The clip has to carry alpha. VP9 keeps its alpha channel outside the frame and only libvpx's
+decoder reads it, which is why the daemon asks mpv for that decoder. `ffprobe` reports
+`TAG:alpha_mode=1` on a file that has it. Encoding one:
+
+```bash
+ffmpeg -i source.mov -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 doorbell.webm
+```
+
+An encode without `-pix_fmt yuva420p` drops the alpha channel silently, and the clip then covers
+the display rather than sitting over it.
+
+The compositor has to leave the window alone. niri draws the focus ring behind a window rather
+than around it, so a transparent window shows the ring instead of what is underneath. The clip
+window holds the focus while it plays, because that is what keeps it above a fullscreen camera, so
+niri needs one rule to stop drawing on it:
+
+```kdl
+window-rule {
+    match app-id="missiond-stinger"
+    focus-ring {
+        off
+    }
+    border {
+        off
+    }
+}
+```
+
+Without the rule the clip still plays and still covers the transition; its transparent parts show
+niri's ring colour rather than the camera.
 
 ### Raising an alert
 

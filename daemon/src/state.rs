@@ -10,7 +10,7 @@ use crate::{
     events::Events,
     hass::HassManager,
     notifications::{Notifications, Sidebar},
-    player::Player,
+    player::{overlay::Overlay, Player},
 };
 
 pub type State = Arc<AppState>;
@@ -24,6 +24,7 @@ pub struct AppState {
     pub notifications: Arc<Notifications>,
     pub sidebar: Arc<Sidebar>,
     pub player: Arc<Player>,
+    pub overlay: Arc<Overlay>,
     pub hass: Arc<HassManager>,
     pub runtime: Runtime,
     pub admin_key: Option<String>,
@@ -44,6 +45,7 @@ impl AppState {
         };
 
         let hass = HassManager::new(&device).await?;
+        let dirs_state = config.dirs.state.clone();
         let player = Arc::new(Player::new(&config.dirs.state));
 
         let state = Arc::new(Self {
@@ -55,6 +57,7 @@ impl AppState {
             notifications: Arc::new(Notifications::new()),
             sidebar: Arc::new(Sidebar::new()),
             player,
+            overlay: Arc::new(Overlay::new(&dirs_state)),
             hass: Arc::new(hass),
             runtime,
             admin_key,

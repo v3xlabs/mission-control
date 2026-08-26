@@ -8,13 +8,12 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     rollupOptions: {
-      // The alert and stinger pages are what the display itself loads. They are separate entry
-      // points so neither pulls in the admin interface, which would slow down the one moment
-      // where load time is visible on the wall.
+      // The alert page is what the display itself loads. It is a separate entry point so it does
+      // not pull in the admin interface, which would slow down the one moment where load time is
+      // visible on the wall.
       input: {
         main: resolve(import.meta.dirname, "index.html"),
         notify: resolve(import.meta.dirname, "notify.html"),
-        stinger: resolve(import.meta.dirname, "stinger.html"),
       },
     },
   },

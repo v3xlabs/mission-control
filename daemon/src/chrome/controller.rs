@@ -22,6 +22,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     config::{ChromiumConfig, Source, Tab},
+    player::{self, niri},
     state::AppState,
 };
 
@@ -29,9 +30,8 @@ use super::{capture, ChromeMessage, ChromeResponse, ChromeState, Preview, Reques
 
 const PROFILE_DIRECTORY: &str = "chromium-profile";
 
-/// Tabs the daemon opens for itself. They are not in `tabs.toml` and never appear in a playlist.
+/// The tab the daemon opens for itself. It is not in `tabs.toml` and never appears in a playlist.
 const ALERT_TAB: &str = "missiond:alert";
-const STINGER_TAB: &str = "missiond:stinger";
 
 /// Chromium records the owning instance as a `<hostname>-<pid>` symlink at `SingletonLock`.
 fn lock_owner(profile: &std::path::Path) -> Option<u32> {
@@ -459,6 +459,8 @@ impl ChromeController {
                 let mpv = app_state.config.read().await.device.mpv;
 
                 app_state.player.show(tab_id, stream, &mpv).await?;
+
+                self.focus_camera(tab_id, app_state).await;
             }
             _ => {
                 // An open page is enough to bring forward. The alert and transition pages are
@@ -552,13 +554,26 @@ impl ChromeController {
         // Doing it before the clip plays is the whole point of playing one.
         self.ensure_page(&target, app_state).await;
 
-        if let Some(stinger) = stinger {
-            self.play_stinger(&stinger, app_state).await;
-        }
+        let clip = match stinger {
+            Some(name) => self.start_stinger(&name, app_state).await,
+            None => None,
+        };
 
         let playlist_id = playlist_id.unwrap_or_default();
 
+        // The target comes up behind the clip rather than after it. A camera needs seconds to
+        // connect, and those are the seconds the clip is there to cover.
         self.activate_tab(&target, &playlist_id, app_state).await?;
+
+        if let Some(hold) = clip {
+            // Activating the target took the focus, and the compositor shows the focused window.
+            // The clip goes back on top of what is now underneath it.
+            app_state.overlay.raise().await;
+
+            tokio::time::sleep(hold).await;
+            app_state.overlay.stop().await;
+            self.focus_camera(&target, app_state).await;
+        }
 
         {
             let mut state = self.state.lock().await;
@@ -645,48 +660,45 @@ impl ChromeController {
         format!("http://127.0.0.1:{port}/{path}")
     }
 
-    async fn play_stinger(&self, name: &str, app_state: &Arc<AppState>) {
-        let notifications = app_state.config.read().await.notifications;
+    /// Puts the clip on screen and reports how long it may hold it.
+    async fn start_stinger(&self, name: &str, app_state: &Arc<AppState>) -> Option<Duration> {
+        let config = app_state.config.read().await;
 
-        let Some(stinger) = notifications.stinger(name) else {
+        let Some(stinger) = config.notifications.stinger(name) else {
             warn!("no stinger named {name}");
 
-            return;
+            return None;
         };
 
-        let tab = Tab {
-            tab_id: STINGER_TAB.to_string(),
-            name: None,
-            persist: false,
-            scale: None,
-            stinger: None,
-            source: Source::Url(self.own_url(app_state, &format!("stinger.html?name={name}")).await),
-        };
+        let file = app_state.config.dirs.config.join("media").join(&stinger.file);
 
-        if let Err(error) = self.recreate_from(&tab).await {
-            warn!("failed to show the stinger: {error}");
+        match app_state.overlay.start(&file, &config.device.mpv).await {
+            Ok(()) => Some(stinger.max_duration.into()),
+            Err(error) => {
+                warn!("could not play the stinger {name}: {error}");
 
+                None
+            }
+        }
+    }
+
+    /// A camera window opens without the focus, and the panel shows the focused window, so a
+    /// camera is on the wall only while it holds the focus. Anything else on screen is a page,
+    /// which the browser window already has.
+    async fn focus_camera(&self, tab_id: &str, app_state: &Arc<AppState>) {
+        let is_camera = app_state
+            .config
+            .tab(tab_id)
+            .await
+            .is_some_and(|tab| matches!(tab.source, Source::Rtsp(_)));
+
+        if !is_camera {
             return;
         }
 
-        let playlist_id = self
-            .state
-            .lock()
-            .await
-            .current_playlist_id
-            .clone()
-            .unwrap_or_default();
-
-        if let Err(error) = self
-            .activate_tab(STINGER_TAB, &playlist_id, app_state)
-            .await
-        {
-            warn!("failed to bring the stinger forward: {error}");
-
-            return;
+        if let Err(error) = niri::focus(player::APP_ID).await {
+            warn!("could not bring the camera window forward: {error}");
         }
-
-        tokio::time::sleep(stinger.max_duration.into()).await;
     }
 
     async fn recreate_from(&self, tab: &Tab) -> Result<()> {

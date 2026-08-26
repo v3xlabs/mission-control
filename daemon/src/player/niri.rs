@@ -1,4 +1,7 @@
-use std::{path::Path, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::{anyhow, Context as _, Result};
 use serde::Deserialize;
@@ -27,17 +30,42 @@ struct Window {
 /// focuses it. niri answers json on the socket it names in `NIRI_SOCKET`, which is cheaper than a
 /// shell script and needs nothing on the daemon's PATH.
 pub async fn focus(app_id: &str) -> Result<()> {
-    let socket = std::env::var("NIRI_SOCKET").context("NIRI_SOCKET is not set")?;
+    focus_on(&socket()?, app_id).await
+}
 
-    focus_on(Path::new(&socket), app_id).await
+/// Lifts the window carrying `app_id` out of the tiling layout and focuses it.
+///
+/// niri draws a floating window over the tiled ones, which is the only stacking it offers a
+/// client that cannot speak layer-shell. The focus goes with it, because a fullscreen window
+/// covers floating windows while it is the focused one, and the camera is fullscreen.
+pub async fn float(app_id: &str) -> Result<()> {
+    let socket = socket()?;
+    let id = wait_for_window(&socket, app_id).await?;
+
+    request(&socket, &json!({ "Action": { "MoveWindowToFloating": { "id": id } } })).await?;
+    request(&socket, &json!({ "Action": { "FocusWindow": { "id": id } } })).await?;
+
+    Ok(())
+}
+
+fn socket() -> Result<PathBuf> {
+    std::env::var("NIRI_SOCKET")
+        .map(PathBuf::from)
+        .context("NIRI_SOCKET is not set")
 }
 
 async fn focus_on(socket: &Path, app_id: &str) -> Result<()> {
+    let id = wait_for_window(socket, app_id).await?;
+
+    request(socket, &json!({ "Action": { "FocusWindow": { "id": id } } })).await?;
+
+    Ok(())
+}
+
+async fn wait_for_window(socket: &Path, app_id: &str) -> Result<u64> {
     for _ in 0..ATTEMPTS {
         if let Some(id) = window_id(socket, app_id).await? {
-            request(socket, &json!({ "Action": { "FocusWindow": { "id": id } } })).await?;
-
-            return Ok(());
+            return Ok(id);
         }
 
         tokio::time::sleep(POLL).await;

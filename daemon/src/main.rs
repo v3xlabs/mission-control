@@ -78,6 +78,7 @@ async fn main() -> Result<()> {
     }
 
     state.player.shutdown().await;
+    state.overlay.shutdown().await;
     state.sidebar.hide().await;
 
     Ok(())
