@@ -204,7 +204,21 @@ still shows it, because that reads the compositor. And `POST /api/tabs` cannot c
 stream url is a credential, and the API writes what it is given back to disk.
 
 mpv has to be on the daemon's PATH. Under the NixOS module that means `extraPackages`. The window
-carries the app id `missiond-camera`, so a compositor rule can match it.
+carries the app id `missiond-camera`, which is how the daemon finds it again and what a compositor
+rule matches on.
+
+A camera is a second window, and which window reaches the panel is the compositor's decision. niri
+holds every window in one scrolling layout, and it hands the focus to a new window only when the
+client can show that a person opened it. A player started by a daemon cannot, so the camera window
+arrives in a column beside the browser and is never seen. missiond focuses it itself, over the
+socket niri names in `NIRI_SOCKET`. `niri --session` puts that variable in the user manager's
+environment, so a user service inherits it and nothing has to be configured.
+
+The way back needs nothing. Stopping the camera destroys its window, and the browser is the only
+window the compositor has left to focus.
+
+On a compositor that is not niri the daemon logs that it could not bring the window forward, and
+where that window lands is up to that compositor.
 
 A camera that drops leaves its last frame on the wall rather than closing its window, which would
 put whatever page is behind it on screen instead.

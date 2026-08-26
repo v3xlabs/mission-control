@@ -1,3 +1,5 @@
+pub mod niri;
+
 use std::{path::PathBuf, time::Duration};
 
 use anyhow::{anyhow, Context as _, Result};
@@ -11,7 +13,8 @@ use tracing::{info, warn};
 
 use crate::config::{MpvConfig, SecretRef};
 
-/// The app id the camera window carries, so a compositor rule can match it.
+/// The app id the camera window carries, so the daemon can find it again and a compositor rule
+/// can match it.
 const APP_ID: &str = "missiond-camera";
 
 /// How long mpv gets to answer a command before the caller gives up on it.
@@ -51,6 +54,10 @@ impl Player {
 
         self.command(&["loadfile", &url]).await?;
         *self.showing.lock().await = Some(tab_id.to_string());
+
+        if let Err(error) = niri::focus(APP_ID).await {
+            warn!("could not bring the camera window forward: {error}");
+        }
 
         info!("camera {tab_id} playing");
 
