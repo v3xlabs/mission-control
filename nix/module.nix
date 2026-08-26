@@ -98,6 +98,15 @@
       version = 1;
       playlists = dropNulls (namedList "playlist_id" cfg.settings.playlists);
     }} "$out/playlists.toml"
+    ln -s ${toml.generate "notifications.toml" (dropNulls ({version = 1;} // cfg.settings.notifications))} "$out/notifications.toml"
+
+    # A stinger clip is a build input like anything else, so the media directory is assembled
+    # here rather than left for someone to copy onto the machine by hand.
+    mkdir -p "$out/media"
+    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: file: ''
+        ln -s ${file} "$out/media/${name}"
+      '')
+      cfg.settings.media)}
   '';
 
   configDir =
@@ -184,8 +193,8 @@ in {
             type = passthrough;
             default = {};
             description = ''
-              Browser settings. `fullscreen = true` restores the old kiosk behaviour, at the cost
-              of overlay surfaces no longer being able to reserve space beside the page.
+              Browser settings. `fullscreen` defaults to true, which covers the output and hides
+              the browser's own interface. Turning it off leaves a window the compositor tiles.
             '';
           };
 
@@ -210,6 +219,37 @@ in {
               }
             '';
             description = "Tabs, keyed by tab id.";
+          };
+
+          notifications = lib.mkOption {
+            type = passthrough;
+            default = {};
+            example = lib.literalExpression ''
+              {
+                mode = "takeover";
+                default_duration = "20s";
+                stingers.doorbell = {
+                  file = "doorbell.webm";
+                  max_duration = "2s";
+                };
+              }
+            '';
+            description = "Alert behaviour and the named stinger clips.";
+          };
+
+          media = lib.mkOption {
+            type = types.attrsOf types.path;
+            default = {};
+            example = lib.literalExpression ''
+              {
+                "doorbell.webm" = ./media/doorbell.webm;
+              }
+            '';
+            description = ''
+              Files placed in the config directory's media, keyed by the name a stinger refers
+              to. A path here can be a file in your configuration, or any derivation that
+              produces one.
+            '';
           };
 
           playlists = lib.mkOption {

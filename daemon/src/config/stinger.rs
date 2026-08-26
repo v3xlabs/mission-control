@@ -9,7 +9,7 @@ use super::HumanDuration;
 /// wait becomes part of the transition rather than a fault.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Stinger {
-    /// A path under the config directory's `media`, or an absolute path.
+    /// The name of a file in the config directory's `media`.
     pub file: String,
     /// The clip is cut off here even if it has not ended, so a mis-encoded file cannot strand the
     /// display on a transition.

@@ -59,6 +59,19 @@ for the schema.
 
       tabs.grafana-overview.url = "http://127.0.0.1:3001/d/mission-overview?kiosk";
 
+      tabs.front-door = {
+        url = "http://camera.example/stream";
+        stinger = "doorbell";
+      };
+
+      # A stinger names a file, and `media` is what puts that file in the config directory.
+      notifications.stingers.doorbell = {
+        file = "doorbell.webm";
+        max_duration = "1500ms";
+      };
+
+      media."doorbell.webm" = ./media/doorbell.webm;
+
       playlists.mission-display = {
         interval = "1m";
         is_default = true;

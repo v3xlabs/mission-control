@@ -193,7 +193,7 @@ Rotation aligns to the wall clock: a one minute interval changes on the minute.
 
 ## Durations
 
-`30s`, `5m`, `1h`. A bare number is seconds. These are what the daemon writes back, so a
+`750ms`, `30s`, `5m`, `1h`. A bare number is seconds. These are what the daemon writes back, so a
 round trip through the web UI does not turn `1m` into `60`.
 
 ## Secrets
@@ -319,6 +319,22 @@ stinger = "doorbell"
 Files live in `media` inside the config directory. That directory can be a Nix store path, which
 makes a clip a build input like anything else. `max_duration` cuts the clip off even if it has not
 ended, so a mis-encoded file cannot strand the display mid-transition.
+
+Under the NixOS module, `media` is an attribute set keyed by the name a stinger refers to. The
+value is any path: a file next to your configuration, or a derivation that produces one.
+
+```nix
+services.missiond.settings = {
+  notifications.stingers.doorbell = {
+    file = "doorbell.webm";
+    max_duration = "1500ms";
+  };
+
+  media."doorbell.webm" = ./media/doorbell.webm;
+};
+```
+
+The file has to be in the git tree of the flake it is referenced from, or Nix cannot see it.
 
 ### Raising an alert
 
