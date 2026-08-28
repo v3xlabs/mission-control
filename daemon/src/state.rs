@@ -9,7 +9,7 @@ use crate::{
     display::{capture::OutputCapture, Display},
     events::Events,
     hass::HassManager,
-    notifications::{Notifications, Sidebar},
+    notifications::{Notifications, Surfaces},
     player::{overlay::Overlay, Player},
 };
 
@@ -22,7 +22,7 @@ pub struct AppState {
     pub capture: Arc<OutputCapture>,
     pub events: Arc<Events>,
     pub notifications: Arc<Notifications>,
-    pub sidebar: Arc<Sidebar>,
+    pub surfaces: Arc<Surfaces>,
     pub player: Arc<Player>,
     pub overlay: Arc<Overlay>,
     pub hass: Arc<HassManager>,
@@ -55,7 +55,7 @@ impl AppState {
             capture: Arc::new(OutputCapture::new()),
             events: Arc::new(Events::new()),
             notifications: Arc::new(Notifications::new()),
-            sidebar: Arc::new(Sidebar::new()),
+            surfaces: Arc::new(Surfaces::new()),
             player,
             overlay: Arc::new(Overlay::new(&dirs_state)),
             hass: Arc::new(hass),

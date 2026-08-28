@@ -1,0 +1,11 @@
+version = 1
+
+[[tabs]]
+tab_id = "webui"
+name = "Web UI"
+url = "http://127.0.0.1:3177/"
+
+[[tabs]]
+tab_id = "docs"
+name = "API docs"
+url = "http://127.0.0.1:3177/docs"

@@ -13,9 +13,14 @@ pub struct NotificationsDocument {
     pub mode: NotificationMode,
     #[serde(default = "default_duration")]
     pub default_duration: HumanDuration,
-    /// How wide the sidebar window asks to be, in pixels. The compositor has the final say.
+    /// How wide the rail is, in logical pixels. The daemon narrows the display by this much and
+    /// gives the column the remainder, so the number is the one that reaches the screen.
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: u32,
+    #[serde(default = "default_toast_width")]
+    pub toast_width: u32,
+    #[serde(default = "default_toast_height")]
+    pub toast_height: u32,
     /// Named clips a tab or a notification can ask for.
     #[serde(default)]
     pub stingers: HashMap<String, Stinger>,
@@ -29,6 +34,14 @@ const fn default_sidebar_width() -> u32 {
     480
 }
 
+const fn default_toast_width() -> u32 {
+    420
+}
+
+const fn default_toast_height() -> u32 {
+    180
+}
+
 impl Default for NotificationsDocument {
     fn default() -> Self {
         Self {
@@ -36,6 +49,8 @@ impl Default for NotificationsDocument {
             mode: NotificationMode::default(),
             default_duration: default_duration(),
             sidebar_width: default_sidebar_width(),
+            toast_width: default_toast_width(),
+            toast_height: default_toast_height(),
             stingers: HashMap::new(),
         }
     }

@@ -20,6 +20,7 @@ pub mod events;
 pub mod hass;
 pub mod http;
 pub mod notifications;
+pub mod niri;
 pub mod player;
 pub mod state;
 
@@ -50,6 +51,7 @@ async fn main() -> Result<()> {
     }
 
     tokio::spawn(run_schedule(state.clone()));
+    tokio::spawn(notifications::surfaces::run(state.clone()));
 
     if state.hass.is_enabled() {
         let hass = state.hass.clone();
@@ -79,7 +81,7 @@ async fn main() -> Result<()> {
 
     state.player.shutdown().await;
     state.overlay.shutdown().await;
-    state.sidebar.hide().await;
+    state.surfaces.shutdown(&state).await;
 
     Ok(())
 }

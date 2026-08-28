@@ -1,0 +1,3 @@
+version = 1
+mode = "sidebar"
+default_duration = "20s"

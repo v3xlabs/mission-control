@@ -10,6 +10,14 @@ web:
 kiosk:
     cage -- just dev
 
+# A nested niri with missiond inside it, on .tmp/lab. Mod+Shift+E quits it.
+lab: web-dist
+    ./dev/lab.sh
+
+# Talk to the missiond running in the lab.
+lab-api *ARGS:
+    curl -sS -H 'content-type: application/json' http://127.0.0.1:3177/api{{ARGS}}
+
 schema:
     cd web && pnpm api-schema
 
@@ -19,10 +27,11 @@ check:
     cd web && pnpm typecheck
     cd web && pnpm lint
 
-build:
-    # The daemon embeds daemon/web-dist, so the copy belongs to building rather than to each
-    # release workflow separately.
+# Build the web UI into daemon/web-dist, which the daemon embeds.
+web-dist:
     cd web && pnpm build
     rm -rf daemon/web-dist
     cp -r web/dist daemon/web-dist
+
+build: web-dist
     cd daemon && cargo build --release

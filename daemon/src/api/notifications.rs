@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     auth::{authorize, Authorization},
-    ApiError, ApiResult, MutationResult, NotifyRequest, StingerInfo,
+    ApiError, ApiResult, MutationResult, NotifyRequest, SidebarState, StingerInfo,
 };
 
 pub struct NotificationApi {
@@ -41,39 +41,43 @@ impl NotificationApi {
             .push(notification, duration.into())
             .await;
 
-        match mode {
-            NotificationMode::Takeover => {
-                // A transition can take seconds, and the caller is a doorbell or an automation
-                // that should not be held open for it. The takeover runs on its own and ends
-                // itself, so nothing has to come back and clear it.
-                let state = self.state.clone();
+        // The sidebar and the toast are windows the reconciler owns. Pushing the notification is
+        // already what opens them, so there is nothing to do here for either.
+        if mode == NotificationMode::Takeover {
+            // A transition can take seconds, and the caller is a doorbell or an automation that
+            // should not be held open for it. The takeover runs on its own and ends itself, so
+            // nothing has to come back and clear it.
+            let state = self.state.clone();
 
-                tokio::spawn(async move {
-                    if let Err(error) = tell(
-                        &state.chrome,
-                        ChromeMessage::Takeover {
-                            tab_id,
-                            stinger,
-                            seconds: duration.seconds(),
-                        },
-                    )
+            tokio::spawn(async move {
+                if let Err(error) = tell(
+                    &state.chrome,
+                    ChromeMessage::Takeover {
+                        tab_id,
+                        stinger,
+                        seconds: Some(duration.seconds()),
+                    },
+                )
+                .await
+                {
+                    warn!("takeover failed: {error}");
+
+                    return;
+                }
+
+                tokio::time::sleep(Duration::from(duration)).await;
+
+                // Only a live takeover keeps this one on screen. Asking whether anything at all is
+                // live leaves the display on a camera because an agenda entry has not ended yet.
+                if state
+                    .notifications
+                    .current_in(NotificationMode::Takeover)
                     .await
-                    {
-                        warn!("takeover failed: {error}");
-
-                        return;
-                    }
-
-                    tokio::time::sleep(Duration::from(duration)).await;
-
-                    if state.notifications.current().await.is_none() {
-                        let _ = tell(&state.chrome, ChromeMessage::EndTakeover).await;
-                    }
-                });
-            }
-            NotificationMode::Sidebar => {
-                self.state.sidebar.show(&self.state, duration.into()).await;
-            }
+                    .is_none()
+                {
+                    let _ = tell(&state.chrome, ChromeMessage::EndTakeover).await;
+                }
+            });
         }
 
         Ok(Json(MutationResult::applied()))
@@ -114,11 +118,40 @@ impl NotificationApi {
             return Err(ApiError::not_found(notification_id.0));
         }
 
-        if self.state.notifications.current().await.is_none() {
+        if self
+            .state
+            .notifications
+            .current_in(NotificationMode::Takeover)
+            .await
+            .is_none()
+        {
             let _ = tell(&self.state.chrome, ChromeMessage::EndTakeover).await;
-            self.state.sidebar.hide().await;
         }
 
         Ok(Json(MutationResult::applied()))
+    }
+
+    /// Open the rail if it is closed, close it if it is open.
+    ///
+    /// One call, no state to keep at the other end, which is what a button on a launchpad needs.
+    /// A closed rail stays closed until something new arrives for it.
+    #[oai(path = "/sidebar/toggle", method = "post")]
+    async fn toggle_sidebar(
+        &self,
+        authorization: Authorization,
+    ) -> ApiResult<Json<SidebarState>> {
+        authorize(&self.state, &authorization)?;
+
+        let open = self.state.surfaces.toggle_sidebar(&self.state).await;
+
+        Ok(Json(SidebarState { open }))
+    }
+
+    /// Whether the rail is up.
+    #[oai(path = "/sidebar", method = "get")]
+    async fn sidebar(&self) -> ApiResult<Json<SidebarState>> {
+        Ok(Json(SidebarState {
+            open: self.state.surfaces.sidebar.is_open().await,
+        }))
     }
 }

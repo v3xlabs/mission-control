@@ -1,5 +1,4 @@
 pub mod mpv;
-pub mod niri;
 pub mod overlay;
 
 use anyhow::{Context as _, Result};

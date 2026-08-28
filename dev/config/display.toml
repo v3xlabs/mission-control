@@ -1,0 +1,5 @@
+version = 1
+
+# No output is named, so the schedule does nothing. A nested niri has no backlight to drive and
+# no monitor to switch off.
+schedule = []

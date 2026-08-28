@@ -10,11 +10,14 @@ pub enum ChromeMessage {
     RecreateTab { tab_id: String },
     CloseTab { tab_id: String },
     GetStatus,
-    /// Put an alert on screen and hold it there until it expires.
+    /// Put something on screen and hold it there.
+    ///
+    /// Without a number of seconds the hold has no end, and only `EndTakeover` clears it. That is
+    /// what a button that puts the calendar up and takes it away again needs.
     Takeover {
         tab_id: Option<String>,
         stinger: Option<String>,
-        seconds: u64,
+        seconds: Option<u64>,
     },
     /// Return to whatever the playlist was showing before a takeover.
     EndTakeover,

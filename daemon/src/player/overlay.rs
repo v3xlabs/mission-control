@@ -4,9 +4,9 @@ use anyhow::Result;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
-use crate::config::MpvConfig;
+use crate::{config::MpvConfig, niri};
 
-use super::{mpv::Mpv, niri};
+use super::mpv::Mpv;
 
 /// The app id the clip window carries, so a compositor rule can match it.
 const APP_ID: &str = "missiond-stinger";

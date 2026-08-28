@@ -41,6 +41,10 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
         .at("/api/screen", get(screen).data(state.clone()))
         .at("/api/media/:name", get(media).data(state.clone()))
         .at("/api/events", get(events).data(state.clone()))
+        .at(
+            "/api/notifications/stream",
+            get(notification_stream).data(state.clone()),
+        )
         .nest("/api", api_service)
         .nest("/docs", ui)
         .at("/docs/spec", spec)
@@ -148,6 +152,36 @@ fn events(state: Data<&Arc<AppState>>) -> SSE {
             }
 
             if receiver.changed().await.is_err() {
+                break;
+            }
+        }
+    })
+    .keep_alive(Duration::from_secs(30))
+}
+
+/// How often the notification stream looks for something that ended on its own.
+///
+/// This is not a keep alive. `Notifications::active` is what drops an expired entry and announces
+/// it, and it only runs when somebody asks, so this timeout is the only thing that notices a
+/// meeting finishing. Without it the last entry of the day would sit on the rail until the next
+/// alert arrived, and the window would never close.
+const SWEEP: Duration = Duration::from_secs(5);
+
+#[handler]
+fn notification_stream(state: Data<&Arc<AppState>>) -> SSE {
+    let state = state.0.clone();
+    let mut changed = state.notifications.subscribe();
+
+    SSE::new(async_stream::stream! {
+        loop {
+            let active = state.notifications.active().await;
+
+            if let Ok(payload) = serde_json::to_string(&active) {
+                yield Event::message(payload);
+            }
+
+            // A closed channel ends the stream. A timeout is a sweep, and sends again.
+            if let Ok(Err(_)) = tokio::time::timeout(SWEEP, changed.changed()).await {
                 break;
             }
         }

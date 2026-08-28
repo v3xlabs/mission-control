@@ -1,0 +1,12 @@
+version = 1
+name = "Lab Display"
+device_id = "lab-display"
+
+[http]
+host = "127.0.0.1"
+port = 3177
+
+[chromium]
+# The sidebar is a tiled column beside the browser. A fullscreen window is not subject to the
+# space the compositor gives that column, so the rail would be covered rather than beside.
+fullscreen = false

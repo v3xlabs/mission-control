@@ -1,45 +1,33 @@
 import { useEffect, useState } from "react";
 
-export type Alert = {
-  notification_id: number;
-  title: string;
-  body?: string;
-  level: "info" | "warning" | "critical";
-  expires_in_seconds: number;
-  tab_id?: string;
-};
+import type { components } from "../api/schema.gen";
+
+export type Alert = components["schemas"]["Notification"];
 
 /**
- * Polls rather than subscribing. This page is opened for the seconds an alert is up and closed
- * again, so a stream would spend its life reconnecting for no gain.
+ * Subscribes rather than polls. The rail is open for as long as there is something on it, which
+ * for a calendar is most of a working day, and a request a second for that is a lot of asking for
+ * a list that changes a few times an hour.
+ *
+ * The daemon sweeps on a timer of its own, so an entry that ends without anything else happening
+ * still arrives here as a message.
  */
 export const useAlerts = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
-    let isCancelled = false;
+    const source = new EventSource("/api/notifications/stream");
 
-    const read = async () => {
+    source.addEventListener("message", (event) => {
       try {
-        const response = await fetch("/api/notifications");
-
-        if (!isCancelled && response.ok) {
-          setAlerts(await response.json() as Alert[]);
-        }
+        setAlerts(JSON.parse(event.data as string) as Alert[]);
       }
       catch {
-        // A daemon that is restarting is not worth reporting on the wall.
+        // A half-written frame is not worth reporting on the wall.
       }
-    };
+    });
 
-    read();
-
-    const timer = setInterval(read, 1000);
-
-    return () => {
-      isCancelled = true;
-      clearInterval(timer);
-    };
+    return () => source.close();
   }, []);
 
   return alerts;

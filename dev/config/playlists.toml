@@ -1,0 +1,8 @@
+version = 1
+
+[[playlists]]
+playlist_id = "lab"
+name = "Lab"
+interval = "30s"
+is_default = true
+tabs = ["webui", "docs"]

@@ -1,0 +1,58 @@
+// A niri for watching missiond work, nested in a window on the desktop you are already using.
+// This is not a session config. It has one keybind worth knowing, Mod+Shift+E to quit.
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+// Chromium draws its own title bar on an --app window. niri only takes the decoration over if it
+// is asked to, and a title bar on a wall display is the browser showing through.
+prefer-no-csd
+
+layout {
+    gaps 0
+
+    border {
+        off
+    }
+
+    focus-ring {
+        off
+    }
+}
+
+window-rule {
+    // The display browser runs with chromium.fullscreen off, because a fullscreen window is not
+    // subject to the column the compositor gives the sidebar and would cover it.
+    match app-id="chromium-browser"
+    open-maximized true
+    draw-border-with-background false
+}
+
+window-rule {
+    match app-id="missiond-sidebar"
+    default-column-width { fixed 420; }
+    open-focused false
+}
+
+window-rule {
+    match app-id="missiond-toast"
+    open-floating true
+    open-focused false
+    default-column-width { fixed 360; }
+}
+
+window-rule {
+    match app-id="missiond-stinger"
+    focus-ring {
+        off
+    }
+    border {
+        off
+    }
+}
+
+binds {
+    Mod+Shift+E { quit skip-confirmation=true; }
+    Mod+Q { close-window; }
+}

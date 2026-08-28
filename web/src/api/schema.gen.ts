@@ -1934,6 +1934,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sidebar/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the rail if it is closed, close it if it is open.
+         * @description One call, no state to keep at the other end, which is what a button on a launchpad needs.
+         *     A closed rail stays closed until something new arrives for it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    authorization?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["SidebarState"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sidebar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the rail is up. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["SidebarState"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ErrorBody"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1990,6 +2130,9 @@ export interface components {
         Notification: {
             /** Format: uint64 */
             notification_id: number;
+            /** @description Two pushes carrying one key are one alert said twice. A calendar poll re-derives the same
+             *     occurrence every cycle, and this is what stops that becoming a second card. */
+            key?: string;
             title: string;
             body?: string;
             level: components["schemas"]["Level"];
@@ -1999,6 +2142,15 @@ export interface components {
              * @description Seconds from now until it expires, so a page can count down without a shared clock.
              */
             expires_in_seconds: number;
+            /**
+             * Format: date-time
+             * @description When the thing this alert is about happens. A calendar entry has one; a doorbell does not,
+             *     and renders the way it does today.
+             */
+            starts_at?: string;
+            /** Format: date-time */
+            ends_at?: string;
+            location?: string;
             /** @description A tab to put on screen instead of a message card. This is what turns a doorbell alert into
              *     the camera feed rather than the word "doorbell". */
             tab_id?: string;
@@ -2009,7 +2161,7 @@ export interface components {
          * @description How an alert reaches the screen.
          * @enum {string}
          */
-        NotificationMode: "takeover" | "sidebar";
+        NotificationMode: "takeover" | "sidebar" | "toast";
         /**
          * NotifyRequest
          * @description One endpoint everything can reach: a Home Assistant automation, a Stream Deck key, a CI job.
@@ -2022,6 +2174,17 @@ export interface components {
             mode?: components["schemas"]["NotificationMode"] & unknown;
             /** @description A duration such as `20s`. Falls back to the configured default. */
             duration?: string;
+            /** @description Two calls carrying one key are one alert said twice: the second replaces the first rather
+             *     than stacking beside it. An automation that fires on every door event gets this for free. */
+            key?: string;
+            /**
+             * Format: date-time
+             * @description When the thing this alert is about happens, so the card can show a time and count down.
+             */
+            starts_at?: string;
+            /** Format: date-time */
+            ends_at?: string;
+            location?: string;
             /** @description Show this tab rather than a message card, which is what turns a doorbell alert into the
              *     camera feed instead of the word "doorbell". */
             tab_id?: string;
@@ -2055,6 +2218,13 @@ export interface components {
         /** SetEnabledRequest */
         SetEnabledRequest: {
             enabled: boolean;
+        };
+        /**
+         * SidebarState
+         * @description Where the rail ended up, so a caller that toggled it does not have to ask again.
+         */
+        SidebarState: {
+            open: boolean;
         };
         /**
          * StingerInfo

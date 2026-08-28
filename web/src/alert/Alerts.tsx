@@ -1,23 +1,39 @@
 import { type FC } from "react";
 
 import { AlertCard } from "./AlertCard";
+import type { Alert } from "./useAlerts";
 import { useAlerts } from "./useAlerts";
 
+type Presentation = Alert["mode"];
+
 /**
- * The same page serves both presentations. As a takeover it fills the screen; as a sidebar it is
- * its own window and the compositor decides how wide that is, so it only has to stack.
+ * One page serves all three presentations, and each shows only what is addressed to it. Rendering
+ * the whole list everywhere puts the agenda underneath a doorbell alert and counts the wrong
+ * things in "and 2 more".
  */
-export const Alerts: FC<{ isSidebar: boolean; }> = ({ isSidebar }) => {
-  const alerts = useAlerts();
+export const Alerts: FC<{ presentation: Presentation; }> = ({ presentation }) => {
+  const alerts = useAlerts().filter(alert => alert.mode === presentation);
 
   if (alerts.length === 0) {
     return <main className="h-screen w-screen bg-gray-950" />;
   }
 
-  if (isSidebar) {
+  if (presentation === "sidebar") {
     return (
       <main className="flex h-screen w-screen flex-col gap-3 overflow-y-auto bg-gray-950 p-4">
         {alerts.map(alert => <AlertCard key={alert.notification_id} alert={alert} isLarge={false} />)}
+      </main>
+    );
+  }
+
+  // A toast is one thing in a corner. The card fills the window, because the daemon sized that
+  // window for it and a card floating inside leaves bands of background around the message.
+  if (presentation === "toast") {
+    const [newest] = alerts.slice(-1);
+
+    return (
+      <main className="flex h-screen w-screen bg-gray-950">
+        <AlertCard alert={newest} isLarge={false} />
       </main>
     );
   }

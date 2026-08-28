@@ -22,7 +22,8 @@ use tracing::{error, info, warn};
 
 use crate::{
     config::{ChromiumConfig, Source, Tab},
-    player::{self, niri},
+    niri,
+    player,
     state::AppState,
 };
 
@@ -137,6 +138,21 @@ impl ChromeController {
         self.running.load(Ordering::Relaxed)
     }
 
+    /// The process the display browser runs as.
+    ///
+    /// A surface that has to sit beside the display, or over it, needs the compositor's id for
+    /// that window. Chromium's app id is not something the daemon chooses, so the process is the
+    /// only handle on it that the daemon can be sure of.
+    pub async fn browser_pid(&self) -> Option<u32> {
+        self.browser
+            .lock()
+            .await
+            .as_mut()?
+            .get_mut_child()?
+            .as_mut_inner()
+            .id()
+    }
+
     pub async fn start(self: &Arc<Self>, app_state: &Arc<AppState>) -> Result<()> {
         let config = app_state.config.read().await;
 
@@ -205,6 +221,7 @@ impl ChromeController {
             .arg("--ozone-platform=wayland")
             .arg("--disable-infobars")
             .arg("--disable-session-crashed-bubble")
+            .arg("--hide-crash-restore-bubble")
             .viewport(None);
 
         // `--kiosk` alone is not enough, because a CDP-created tab drags the window back to its
@@ -252,6 +269,7 @@ impl ChromeController {
         let profile = cache.join(PROFILE_DIRECTORY);
 
         clear_stale_locks(&profile);
+        super::mark_clean_exit(&profile);
 
         let (browser, mut handler) = Browser::launch(Self::build_browser_config(config, cache)?).await?;
 
@@ -528,7 +546,7 @@ impl ChromeController {
         &self,
         tab_id: Option<String>,
         stinger: Option<String>,
-        seconds: u64,
+        seconds: Option<u64>,
         app_state: &Arc<AppState>,
     ) -> Result<()> {
         let playlist_id = self.state.lock().await.current_playlist_id.clone();
@@ -578,7 +596,9 @@ impl ChromeController {
         {
             let mut state = self.state.lock().await;
 
-            state.hold_until = Some(Instant::now() + Duration::from_secs(seconds));
+            // A takeover with no end holds by leaving auto rotation stopped. Setting a deadline
+            // here instead would let the next rotation tick step off the page a person asked for.
+            state.hold_until = seconds.map(|seconds| Instant::now() + Duration::from_secs(seconds));
         }
 
         Ok(())
