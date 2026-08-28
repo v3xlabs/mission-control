@@ -80,7 +80,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            Runtime::open(&dir).await.unwrap().get("screen_on").await.unwrap(),
+            Runtime::open(&dir)
+                .await
+                .unwrap()
+                .get("screen_on")
+                .await
+                .unwrap(),
             Some("true".to_string())
         );
     }
@@ -90,6 +95,14 @@ mod tests {
         let dir = std::env::temp_dir().join("missiond-runtime-absent");
         let _ = std::fs::remove_dir_all(&dir);
 
-        assert_eq!(Runtime::open(&dir).await.unwrap().get("nothing").await.unwrap(), None);
+        assert_eq!(
+            Runtime::open(&dir)
+                .await
+                .unwrap()
+                .get("nothing")
+                .await
+                .unwrap(),
+            None
+        );
     }
 }

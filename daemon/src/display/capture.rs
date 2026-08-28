@@ -45,7 +45,12 @@ impl OutputCapture {
             }
         }
 
-        let image = run(&super::substitute(&config.screenshot, config.output.as_deref(), None)).await?;
+        let image = run(&super::substitute(
+            &config.screenshot,
+            config.output.as_deref(),
+            None,
+        ))
+        .await?;
 
         *last = Some((Instant::now(), image.clone()));
 

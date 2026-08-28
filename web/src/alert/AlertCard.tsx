@@ -12,15 +12,37 @@ const edge = {
 
 const clock = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
 
-export const AlertCard: FC<{ alert: Alert; isLarge: boolean; }> = ({ alert, isLarge }) => {
-  // The countdown runs here rather than arriving from the daemon. It changes once a minute and
-  // nothing else about the entry does, so sending it would mean a message a minute per entry.
+export const AlertCard: FC<{ alert: Alert; isLarge: boolean; isWide?: boolean; }> = ({
+  alert,
+  isLarge,
+  isWide = false,
+}) => {
   const relative = useCountdown(alert.starts_at);
+
+  if (isWide) {
+    return (
+      <article className="flex w-full items-center bg-gray-900">
+        <div className={classNames("w-2 self-stretch shrink-0", edge[alert.level])} />
+        <div className="w-64 shrink-0 p-6">
+          {alert.starts_at && (
+            <>
+              <p className="text-4xl font-medium text-gray-200">
+                {clock.format(new Date(alert.starts_at))}
+              </p>
+              {relative && <p className="mt-1 text-xl text-gray-500">{relative}</p>}
+            </>
+          )}
+        </div>
+        <div className="min-w-0 py-6 pr-6">
+          <h1 className="truncate text-4xl font-semibold text-gray-100">{alert.title}</h1>
+          {alert.location && <p className="mt-2 text-2xl text-gray-500">{alert.location}</p>}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className={classNames("flex w-full bg-gray-900", isLarge && "max-w-5xl")}>
-      {/* The level is a colour on one edge rather than a tint over the text, so the words stay
-              at full contrast from across a room. */}
       <div className={classNames("w-2 shrink-0", edge[alert.level])} />
       <div className={classNames("min-w-0", isLarge ? "p-12" : "p-4")}>
         {alert.starts_at && (

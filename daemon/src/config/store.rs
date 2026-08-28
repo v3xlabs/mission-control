@@ -30,6 +30,7 @@ impl ConfigStore {
             tabs: read_document(&dirs.config, Document::Tabs)?,
             playlists: read_document(&dirs.config, Document::Playlists)?,
             notifications: read_document(&dirs.config, Document::Notifications)?,
+            calendars: read_document(&dirs.config, Document::Calendars)?,
         };
 
         info!(
@@ -129,6 +130,7 @@ impl ConfigStore {
             Document::Notifications => {
                 write_document(&self.dirs.config, document, &config.notifications)
             }
+            Document::Calendars => write_document(&self.dirs.config, document, &config.calendars),
         }?;
 
         Ok(Persisted::ToDisk)
@@ -150,9 +152,25 @@ impl ConfigStore {
                 .map(|password| password.export("MISSIOND_MQTT_PASSWORD"));
         }
 
+        // A calendar's address is the credential for it, so an export carries the reference
+        // rather than the link, the same way the admin key does.
+        let mut calendars = config.calendars.clone();
+
+        for calendar in &mut calendars.calendars {
+            let placeholder = format!(
+                "MISSIOND_CALENDAR_{}",
+                calendar.calendar_id.to_uppercase().replace('-', "_")
+            );
+
+            calendar.url = calendar.url.export(&placeholder);
+        }
+
         Ok([
             format!("# device.toml\n{}", toml::to_string_pretty(&device)?),
-            format!("# display.toml\n{}", toml::to_string_pretty(&config.display)?),
+            format!(
+                "# display.toml\n{}",
+                toml::to_string_pretty(&config.display)?
+            ),
             format!("# tabs.toml\n{}", toml::to_string_pretty(&config.tabs)?),
             format!(
                 "# playlists.toml\n{}",
@@ -162,6 +180,7 @@ impl ConfigStore {
                 "# notifications.toml\n{}",
                 toml::to_string_pretty(&config.notifications)?
             ),
+            format!("# calendars.toml\n{}", toml::to_string_pretty(&calendars)?),
         ]
         .join("\n"))
     }
@@ -192,9 +211,7 @@ fn read_document<T: DeserializeOwned + Default>(base: &Path, document: Document)
             warn!(path = %path.display(), "no such document, using defaults");
             Ok(T::default())
         }
-        Err(error) => {
-            Err(error).with_context(|| format!("cannot read {}", path.display()))
-        }
+        Err(error) => Err(error).with_context(|| format!("cannot read {}", path.display())),
     }
 }
 
@@ -312,7 +329,10 @@ url = "https://example.com/one"
             .unwrap();
 
         assert_eq!(persisted, Persisted::MemoryOnly);
-        assert_eq!(store.tabs().await[0].source.describe(), "https://example.com/two");
+        assert_eq!(
+            store.tabs().await[0].source.describe(),
+            "https://example.com/two"
+        );
         assert!(std::fs::read_to_string(dir.join("tabs.toml"))
             .unwrap()
             .contains("example.com/one"));
@@ -355,7 +375,9 @@ disabled_tabs = ["one"]
         let tabs = store.playlist_tabs("wall").await;
 
         assert_eq!(
-            tabs.iter().map(|tab| tab.tab_id.as_str()).collect::<Vec<_>>(),
+            tabs.iter()
+                .map(|tab| tab.tab_id.as_str())
+                .collect::<Vec<_>>(),
             ["three", "two"]
         );
     }

@@ -92,6 +92,5 @@ async fn is_unwanted(
     tab_id: &str,
     state: &Arc<Mutex<ChromeState>>,
 ) -> bool {
-    frames.receiver_count() <= 1
-        && state.lock().await.current_tab_id.as_deref() != Some(tab_id)
+    frames.receiver_count() <= 1 && state.lock().await.current_tab_id.as_deref() != Some(tab_id)
 }

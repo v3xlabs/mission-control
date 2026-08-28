@@ -12,6 +12,7 @@ use crate::{
 };
 
 pub mod api;
+pub mod calendar;
 pub mod chrome;
 pub mod config;
 pub mod db;
@@ -19,8 +20,8 @@ pub mod display;
 pub mod events;
 pub mod hass;
 pub mod http;
-pub mod notifications;
 pub mod niri;
+pub mod notifications;
 pub mod player;
 pub mod state;
 
@@ -52,6 +53,7 @@ async fn main() -> Result<()> {
 
     tokio::spawn(run_schedule(state.clone()));
     tokio::spawn(notifications::surfaces::run(state.clone()));
+    tokio::spawn(calendar::run(state.clone()));
 
     if state.hass.is_enabled() {
         let hass = state.hass.clone();

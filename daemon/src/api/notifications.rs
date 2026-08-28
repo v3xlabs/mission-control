@@ -4,7 +4,8 @@ use poem_openapi::{param::Path, payload::Json, OpenApi};
 use tracing::warn;
 
 use crate::{
-    chrome::{tell, ChromeMessage},
+    calendar,
+    chrome::{tell, ChromeMessage, CALENDAR_TAB},
     config::NotificationMode,
     notifications::Notification,
     state::AppState,
@@ -12,7 +13,7 @@ use crate::{
 
 use super::{
     auth::{authorize, Authorization},
-    ApiError, ApiResult, MutationResult, NotifyRequest, SidebarState, StingerInfo,
+    ApiError, ApiResult, CalendarState, MutationResult, NotifyRequest, SidebarState, StingerInfo,
 };
 
 pub struct NotificationApi {
@@ -41,12 +42,7 @@ impl NotificationApi {
             .push(notification, duration.into())
             .await;
 
-        // The sidebar and the toast are windows the reconciler owns. Pushing the notification is
-        // already what opens them, so there is nothing to do here for either.
         if mode == NotificationMode::Takeover {
-            // A transition can take seconds, and the caller is a doorbell or an automation that
-            // should not be held open for it. The takeover runs on its own and ends itself, so
-            // nothing has to come back and clear it.
             let state = self.state.clone();
 
             tokio::spawn(async move {
@@ -67,8 +63,6 @@ impl NotificationApi {
 
                 tokio::time::sleep(Duration::from(duration)).await;
 
-                // Only a live takeover keeps this one on screen. Asking whether anything at all is
-                // live leaves the display on a camera because an agenda entry has not ended yet.
                 if state
                     .notifications
                     .current_in(NotificationMode::Takeover)
@@ -99,7 +93,7 @@ impl NotificationApi {
         ))
     }
 
-    /// Everything currently showing. The alert pages read this.
+    /// Everything currently showing.
     #[oai(path = "/notifications", method = "get")]
     async fn list(&self) -> ApiResult<Json<Vec<Notification>>> {
         Ok(Json(self.state.notifications.active().await))
@@ -131,15 +125,10 @@ impl NotificationApi {
         Ok(Json(MutationResult::applied()))
     }
 
-    /// Open the rail if it is closed, close it if it is open.
-    ///
-    /// One call, no state to keep at the other end, which is what a button on a launchpad needs.
-    /// A closed rail stays closed until something new arrives for it.
+    /// Open the rail if it is closed, close it if it is open. A rail closed this way stays closed
+    /// until something new arrives for it.
     #[oai(path = "/sidebar/toggle", method = "post")]
-    async fn toggle_sidebar(
-        &self,
-        authorization: Authorization,
-    ) -> ApiResult<Json<SidebarState>> {
+    async fn toggle_sidebar(&self, authorization: Authorization) -> ApiResult<Json<SidebarState>> {
         authorize(&self.state, &authorization)?;
 
         let open = self.state.surfaces.toggle_sidebar(&self.state).await;
@@ -153,5 +142,47 @@ impl NotificationApi {
         Ok(Json(SidebarState {
             open: self.state.surfaces.sidebar.is_open().await,
         }))
+    }
+
+    /// Put the full-screen agenda on the display, or take it away and resume the playlist. The
+    /// hold has no end: the agenda stays until the second call.
+    #[oai(path = "/calendar/toggle", method = "post")]
+    async fn toggle_calendar(
+        &self,
+        authorization: Authorization,
+    ) -> ApiResult<Json<CalendarState>> {
+        authorize(&self.state, &authorization)?;
+
+        let showing = self
+            .state
+            .chrome
+            .state
+            .lock()
+            .await
+            .current_tab_id
+            .as_deref()
+            == Some(CALENDAR_TAB);
+
+        let message = if showing {
+            ChromeMessage::EndTakeover
+        } else {
+            ChromeMessage::Takeover {
+                tab_id: Some(CALENDAR_TAB.to_string()),
+                stinger: None,
+                seconds: None,
+            }
+        };
+
+        tell(&self.state.chrome, message)
+            .await
+            .map_err(ApiError::internal)?;
+
+        Ok(Json(CalendarState { showing: !showing }))
+    }
+
+    /// The entries the configured feeds put in their window, as the agenda page reads them.
+    #[oai(path = "/calendar/agenda", method = "get")]
+    async fn agenda(&self) -> ApiResult<Json<Vec<Notification>>> {
+        Ok(Json(calendar::agenda(&self.state).await))
     }
 }

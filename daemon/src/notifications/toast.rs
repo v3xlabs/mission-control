@@ -7,18 +7,15 @@ use crate::{niri, state::AppState};
 
 use super::Surface;
 
-/// How far the toast sits from the edges of the output.
 const MARGIN: f64 = 24.0;
 
-/// A small window over a corner of the content.
-///
-/// A meeting five minutes away is worth saying and not worth interrupting for. The toast floats,
-/// so nothing is resized and the playlist keeps running underneath it. It holds the focus while it
-/// is up, because a floating window sits behind a fullscreen one otherwise, and the display
-/// browser is usually fullscreen.
+/// Holds the focus while it is up, because niri draws a floating window behind a fullscreen one
+/// otherwise, and the display browser is usually fullscreen.
 pub struct Toast {
     surface: Surface,
-    shown_over: Mutex<Option<u64>>,
+    /// The toast takes the focus to sit above a fullscreen display, so closing has to hand it
+    /// back. Nothing else records that it was taken.
+    took_focus: Mutex<bool>,
 }
 
 impl Default for Toast {
@@ -31,7 +28,7 @@ impl Toast {
     pub fn new() -> Self {
         Self {
             surface: Surface::new("toast-profile", "notify.html?toast=1"),
-            shown_over: Mutex::new(None),
+            took_focus: Mutex::new(false),
         }
     }
 
@@ -65,11 +62,9 @@ impl Toast {
     pub async fn close(&self, app_state: &Arc<AppState>) {
         self.surface.close().await;
 
-        // The focus goes back to the content, or the display is left showing a window that is no
-        // longer there in front of one that is.
-        let Some(_) = self.shown_over.lock().await.take() else {
+        if !std::mem::replace(&mut *self.took_focus.lock().await, false) {
             return;
-        };
+        }
 
         if let Some(pid) = app_state.chrome.browser_pid().await {
             match niri::wait_for_pid(pid).await {
@@ -83,10 +78,8 @@ impl Toast {
         }
     }
 
-    /// The toast sits at the top right of the content, not of the output.
-    ///
-    /// Those are the same thing until the rail is open, and then they are 480 pixels apart: a
-    /// toast anchored to the output would land on top of the agenda it is announcing.
+    /// The top right of the content, not of the output: those differ by the rail's width while it
+    /// is open, and a toast anchored to the output would land on top of the agenda.
     async fn place(
         &self,
         app_state: &Arc<AppState>,
@@ -110,7 +103,7 @@ impl Toast {
         niri::set_height(window_id, height).await?;
         niri::focus_id(window_id).await?;
 
-        *self.shown_over.lock().await = Some(window_id);
+        *self.took_focus.lock().await = true;
 
         Ok(())
     }

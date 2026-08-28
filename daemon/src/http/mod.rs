@@ -11,7 +11,7 @@ use poem::{
         sse::{Event, SSE},
         Data, Path,
     },
-    Body, EndpointExt as _, IntoResponse, Response, Route, Server,
+    Body, Endpoint, EndpointExt as _, IntoResponse, Middleware, Response, Route, Server,
 };
 use rust_embed::RustEmbed;
 use tracing::info;
@@ -21,6 +21,38 @@ use crate::{api, state::AppState};
 #[derive(RustEmbed)]
 #[folder = "web-dist"]
 struct WebAssets;
+
+/// Asset names carry a content hash and change with every build, but the html naming them does
+/// not. A surface profile outlives an upgrade, so a cached page comes back pointing at assets that
+/// are no longer there and renders nothing at all.
+struct NoStore;
+
+impl<E: Endpoint> Middleware<E> for NoStore {
+    type Output = NoStoreEndpoint<E>;
+
+    fn transform(&self, inner: E) -> Self::Output {
+        NoStoreEndpoint { inner }
+    }
+}
+
+struct NoStoreEndpoint<E> {
+    inner: E,
+}
+
+impl<E: Endpoint> Endpoint for NoStoreEndpoint<E> {
+    type Output = Response;
+
+    async fn call(&self, request: poem::Request) -> poem::Result<Self::Output> {
+        let mut response = self.inner.call(request).await?.into_response();
+
+        response.headers_mut().insert(
+            "cache-control",
+            "no-store".parse().expect("a literal header value"),
+        );
+
+        Ok(response)
+    }
+}
 
 pub async fn start_http(state: Arc<AppState>) -> Result<()> {
     let http = state.config.read().await.device.http;
@@ -48,7 +80,7 @@ pub async fn start_http(state: Arc<AppState>) -> Result<()> {
         .nest("/api", api_service)
         .nest("/docs", ui)
         .at("/docs/spec", spec)
-        .nest("/", EmbeddedFilesEndpoint::<WebAssets>::new())
+        .nest("/", EmbeddedFilesEndpoint::<WebAssets>::new().with(NoStore))
         .with(Cors::new());
 
     Server::new(TcpListener::bind(address)).run(app).await?;
@@ -78,8 +110,8 @@ fn not_found(message: &str) -> Response {
         .body(message.to_string())
 }
 
-/// What the compositor is putting on the panel, captured through its screencopy protocol rather
-/// than through the browser. Unlike a tab preview this includes anything drawn over the page.
+/// Captured through the compositor's screencopy protocol, so unlike a tab preview this includes
+/// anything drawn over the page.
 #[handler]
 async fn screen(state: Data<&Arc<AppState>>) -> impl IntoResponse {
     let display = state.config.read().await.display;
@@ -95,7 +127,6 @@ async fn screen(state: Data<&Arc<AppState>>) -> impl IntoResponse {
     }
 }
 
-/// How long the stream waits for a new frame before resending the last one.
 const HEARTBEAT: Duration = Duration::from_secs(2);
 
 #[handler]
@@ -120,14 +151,11 @@ async fn preview_live(state: Data<&Arc<AppState>>, tab_id: Path<String>) -> impl
 
                 yield Ok::<_, std::io::Error>(part.into_bytes());
                 yield Ok(frame);
-                // The trailing boundary goes out with the frame rather than waiting for the next
-                // one. A part is only complete once the following boundary arrives, so a tab that
-                // produces one frame and then stops would otherwise never render at all.
                 yield Ok(format!("\r\n--{BOUNDARY}\r\n").into_bytes());
             }
 
-            // Chromium commits a part only once another one follows it, so a tab whose page has
-            // stopped repainting needs the last frame sent again to appear at all.
+            // Chromium commits a part only once another one follows it, so a page that has
+            // stopped repainting needs its last frame sent again to appear at all.
             if let Ok(Err(_)) = tokio::time::timeout(HEARTBEAT, receiver.changed()).await {
                 break;
             }
@@ -159,12 +187,8 @@ fn events(state: Data<&Arc<AppState>>) -> SSE {
     .keep_alive(Duration::from_secs(30))
 }
 
-/// How often the notification stream looks for something that ended on its own.
-///
-/// This is not a keep alive. `Notifications::active` is what drops an expired entry and announces
-/// it, and it only runs when somebody asks, so this timeout is the only thing that notices a
-/// meeting finishing. Without it the last entry of the day would sit on the rail until the next
-/// alert arrived, and the window would never close.
+/// Not a keep alive: `Notifications::active` drops an expired entry and announces it only when
+/// somebody asks, so this timeout is the only thing that notices the last entry of the day ending.
 const SWEEP: Duration = Duration::from_secs(5);
 
 #[handler]
@@ -180,7 +204,6 @@ fn notification_stream(state: Data<&Arc<AppState>>) -> SSE {
                 yield Event::message(payload);
             }
 
-            // A closed channel ends the stream. A timeout is a sweep, and sends again.
             if let Ok(Err(_)) = tokio::time::timeout(SWEEP, changed.changed()).await {
                 break;
             }
@@ -189,7 +212,6 @@ fn notification_stream(state: Data<&Arc<AppState>>) -> SSE {
     .keep_alive(Duration::from_secs(30))
 }
 
-/// Serves a stinger clip out of the config directory's `media`.
 #[handler]
 async fn media(state: Data<&Arc<AppState>>, name: Path<String>) -> impl IntoResponse {
     if !is_plain_file_name(&name.0) {
@@ -206,9 +228,8 @@ async fn media(state: Data<&Arc<AppState>>, name: Path<String>) -> impl IntoResp
     }
 }
 
-/// The name arrives from a page, so it is checked rather than resolved. Canonicalising instead
-/// would reject the legitimate case, because a Nix-generated config directory reaches its files
-/// through symlinks into other store paths.
+/// Checked rather than resolved: canonicalising would reject the legitimate case, because a
+/// Nix-generated config directory reaches its files through symlinks into other store paths.
 fn is_plain_file_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with('.')

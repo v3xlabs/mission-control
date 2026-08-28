@@ -7,25 +7,16 @@ use crate::{config::NotificationMode, state::AppState};
 
 use super::{Sidebar, Toast};
 
-/// The windows that show notifications, kept matching the list.
-///
-/// One task decides whether each window is up, rather than every caller that raises an alert. A
-/// per alert timer has to guess whether a later alert has already moved its deadline; asking the
-/// list cannot be wrong, and a window that died is reopened by the next pass rather than never.
 pub struct Surfaces {
     pub sidebar: Sidebar,
     pub toast: Toast,
     manual: Mutex<Option<Manual>>,
 }
 
-/// A rail opened or closed by hand, from the web UI or a button somewhere else.
 struct Manual {
     open: bool,
-    /// The newest notification that existed when the button was pressed.
-    ///
-    /// Anything newer than this supersedes the choice, so a rail closed by hand comes back for
-    /// the next meeting rather than staying shut for the rest of the day. Expiry does not, which
-    /// is why this counts notifications rather than changes.
+    /// The newest notification when the button was pressed. Anything newer supersedes the choice,
+    /// while an expiry does not, which is why this is an id rather than a change count.
     after_id: u64,
 }
 
@@ -44,10 +35,6 @@ impl Surfaces {
         }
     }
 
-    /// Opens the rail if it is closed, closes it if it is open, and reports where it ended up.
-    ///
-    /// This is the one call a button needs. Nothing else has to know what is on the rail, which is
-    /// what makes it reachable from a launchpad key or a Home Assistant automation.
     pub async fn toggle_sidebar(&self, app_state: &Arc<AppState>) -> bool {
         let open = !self.sidebar.is_open().await;
 
@@ -99,10 +86,8 @@ impl Surfaces {
     }
 }
 
-/// Follows the notification list for as long as the daemon runs.
-///
-/// Expiry is noticed by `Notifications::active`, which only prunes when it is called, so the
-/// stream in the http layer is what makes an entry that ended on its own reach this loop.
+/// Expiry reaches this loop only because the notification stream calls `Notifications::active`
+/// on a timer. Nothing here notices a meeting ending on its own.
 pub async fn run(app_state: Arc<AppState>) {
     let mut changed = app_state.notifications.subscribe();
 

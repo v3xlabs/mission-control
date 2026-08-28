@@ -64,8 +64,8 @@ mod tests {
     #[tokio::test]
     async fn a_camera_leaves_the_url_out() {
         let tab = Tab {
-            tab_id: "front-door".to_string(),
-            name: Some("Front door".to_string()),
+            tab_id: "entrance-camera".to_string(),
+            name: Some("Entrance".to_string()),
             persist: false,
             scale: None,
             stinger: None,

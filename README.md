@@ -1,7 +1,8 @@
 # missiond
 
 missiond is the daemon that owns an information display. It holds the content, the screen power,
-and one control surface that a browser, Home Assistant and launchpi all drive.
+and one control surface that a browser, Home Assistant, or anything that can make an HTTP request
+all drive.
 
 It runs on a Wayland session, starts Chromium, and rotates a playlist of tabs. What is on screen
 is decided here rather than by the pages themselves.
@@ -12,6 +13,7 @@ Features:
 - Screen power and DDC brightness, on a weekly schedule
 - Poweroff, reboot and suspend over logind
 - Home Assistant MQTT discovery for the screen, the playlist and the tab
+- iCalendar feeds on a rail beside the content, with a toast before each meeting
 - A web UI with live previews, driven by a server sent event stream
 - An OpenAPI-documented REST API
 - A NixOS module that declares the whole configuration
@@ -60,11 +62,12 @@ for the schema.
         }
       ];
 
-      tabs.grafana-overview.url = "http://127.0.0.1:3001/d/mission-overview?kiosk";
+      tabs.overview.url = "https://grafana.example.com/d/overview?kiosk";
 
-      # A camera is played by mpv outside the browser, which is why mpv is in extraPackages.
-      tabs.front-door = {
-        rtsp.file = config.sops.secrets.front_door_rtsp_url.path;
+      # Any RTSP stream can be a tab. A browser has no rtsp:// handler, so mpv plays it outside
+      # the browser, which is why mpv is in extraPackages.
+      tabs.entrance-camera = {
+        rtsp.file = config.sops.secrets.entrance_camera_url.path;
         stinger = "doorbell";
       };
 
@@ -76,10 +79,20 @@ for the schema.
 
       media."doorbell.webm" = ./media/doorbell.webm;
 
-      playlists.mission-display = {
+      # Any iCalendar feed. Its link is a bearer credential, so it takes a reference like the
+      # camera above. Entries appear on a rail beside the content, and a toast goes up five
+      # minutes before each one and again as it starts.
+      calendars.work = {
+        name = "Work";
+        url.file = config.sops.secrets.work_ics.path;
+        window = "12h";
+        leads = ["5m" "0s"];
+      };
+
+      playlists.lobby = {
         interval = "1m";
         is_default = true;
-        tabs = ["grafana-overview"];
+        tabs = ["overview"];
       };
     };
   };
@@ -103,8 +116,14 @@ just          # list the recipes
 just dev      # run the daemon
 just web      # run the web UI against it on :5173
 just kiosk    # run the daemon inside a nested cage session
+just lab      # run it inside a nested niri, in one window on your desktop
 just check    # clippy, tests, typecheck, lint
 just build    # build the web UI, embed it, build the release binary
 ```
+
+`just lab` is the one to reach for when a change touches a window: the rail, the toast overlay and
+the camera all need a compositor the daemon can drive, and a nested niri gives you one without
+touching the session you are working in. It keeps its state under `.tmp/lab`, and `just lab-ics`
+writes a calendar feed with events a few minutes out so the agenda can be watched end to end.
 
 `just schema` regenerates `web/src/api/schema.gen.ts` from a running daemon.

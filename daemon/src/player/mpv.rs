@@ -163,7 +163,9 @@ mod tests {
 
         mpv.ensure_running("mpv", &[]).await.unwrap();
 
-        let refused = mpv.command(&["set_property", "no-such-property", "1"]).await;
+        let refused = mpv
+            .command(&["set_property", "no-such-property", "1"])
+            .await;
 
         mpv.shutdown().await;
 

@@ -16,12 +16,6 @@ const phrase = (startsAt: string) => {
   return relative.format(minutes, "minute");
 };
 
-/**
- * How far off a start time is, in words.
- *
- * The wording is computed while rendering rather than held in state, because it is a function of
- * the clock and the clock is not something React owns. The timer only asks for another render.
- */
 export const useCountdown = (startsAt: string | undefined) => {
   const [, tick] = useReducer((count: number) => count + 1, 0);
 

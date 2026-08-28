@@ -73,7 +73,11 @@ impl Display {
     }
 }
 
-pub(super) fn substitute(template: &[String], output: Option<&str>, percent: Option<u32>) -> Vec<String> {
+pub(super) fn substitute(
+    template: &[String],
+    output: Option<&str>,
+    percent: Option<u32>,
+) -> Vec<String> {
     template
         .iter()
         .map(|part| {
@@ -134,7 +138,14 @@ mod tests {
     #[test]
     fn percent_and_output_are_substituted() {
         let command = substitute(
-            &words(&["ddcutil", "setvcp", "10", "{percent}", "--display", "{output}"]),
+            &words(&[
+                "ddcutil",
+                "setvcp",
+                "10",
+                "{percent}",
+                "--display",
+                "{output}",
+            ]),
             Some("DP-1"),
             Some(65),
         );

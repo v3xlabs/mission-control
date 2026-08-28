@@ -2,16 +2,9 @@ use std::path::Path;
 
 use tracing::warn;
 
-/// Tells a Chromium profile that its last session ended cleanly.
-///
-/// A display is killed rather than closed: systemd stops the unit, the daemon restarts, the
-/// machine loses power. Chromium records that as a crash and comes back asking whether to restore
-/// its pages, in a dialog that sits over whatever the wall is supposed to be showing and that
-/// nobody is standing there to answer. `--disable-session-crashed-bubble` does not cover every
-/// build; the record in the profile is what every build reads.
-///
-/// Rewriting one field is deliberate. Deleting the file would take the window size, the zoom and
-/// the permissions with it.
+/// A display is killed rather than closed, and Chromium records that as a crash and comes back
+/// asking whether to restore its pages, over whatever the wall is supposed to be showing.
+/// `--disable-session-crashed-bubble` does not cover every build; this record does.
 pub fn mark_clean_exit(profile: &Path) {
     let preferences = profile.join("Default").join("Preferences");
 

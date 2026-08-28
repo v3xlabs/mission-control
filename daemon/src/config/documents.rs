@@ -1,5 +1,6 @@
 use super::{
-    DeviceDocument, DisplayDocument, NotificationsDocument, PlaylistsDocument, TabsDocument,
+    CalendarsDocument, DeviceDocument, DisplayDocument, NotificationsDocument, PlaylistsDocument,
+    TabsDocument,
 };
 
 #[derive(Debug, Clone)]
@@ -9,4 +10,5 @@ pub struct Documents {
     pub tabs: TabsDocument,
     pub playlists: PlaylistsDocument,
     pub notifications: NotificationsDocument,
+    pub calendars: CalendarsDocument,
 }

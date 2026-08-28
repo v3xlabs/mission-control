@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod calendar_state;
 pub mod create_playlist_request;
 pub mod device_status;
 pub mod display;
@@ -21,6 +22,7 @@ pub mod tab_info;
 pub mod tabs;
 pub mod upsert_tab_request;
 
+pub use calendar_state::CalendarState;
 pub use create_playlist_request::CreatePlaylistRequest;
 pub use device_status::DeviceStatus;
 pub use error::{ApiError, ApiResult};

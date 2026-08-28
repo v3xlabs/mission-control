@@ -52,7 +52,9 @@ url = "https://example.com/overview"
 "#,
         );
 
-        assert!(matches!(&document.tabs[0].source, Source::Url(url) if url == "https://example.com/overview"));
+        assert!(
+            matches!(&document.tabs[0].source, Source::Url(url) if url == "https://example.com/overview")
+        );
     }
 
     #[test]
@@ -62,17 +64,17 @@ url = "https://example.com/overview"
 version = 1
 
 [[tabs]]
-tab_id = "front-door"
+tab_id = "entrance-camera"
 stinger = "doorbell"
 
 [tabs.rtsp]
-file = "/run/secrets/front-door"
+file = "/run/secrets/entrance-camera"
 "#,
         );
 
         assert!(matches!(
             &document.tabs[0].source,
-            Source::Rtsp(SecretRef::File { file }) if file == "/run/secrets/front-door"
+            Source::Rtsp(SecretRef::File { file }) if file == "/run/secrets/entrance-camera"
         ));
     }
 
@@ -81,13 +83,13 @@ file = "/run/secrets/front-door"
     #[test]
     fn a_camera_survives_a_round_trip() {
         let tab = Tab {
-            tab_id: "front-door".to_string(),
-            name: Some("Front door".to_string()),
+            tab_id: "entrance-camera".to_string(),
+            name: Some("Entrance".to_string()),
             persist: false,
             scale: None,
             stinger: Some("doorbell".to_string()),
             source: Source::Rtsp(SecretRef::File {
-                file: "/run/secrets/front-door".to_string(),
+                file: "/run/secrets/entrance-camera".to_string(),
             }),
         };
 
@@ -100,13 +102,15 @@ file = "/run/secrets/front-door"
 
         assert!(matches!(
             &parse(&body).tabs[0].source,
-            Source::Rtsp(SecretRef::File { file }) if file == "/run/secrets/front-door"
+            Source::Rtsp(SecretRef::File { file }) if file == "/run/secrets/entrance-camera"
         ));
     }
 
     #[test]
     fn a_stream_url_is_never_described() {
-        let source = Source::Rtsp(SecretRef::Inline("rtsp://user:pass@camera/stream".to_string()));
+        let source = Source::Rtsp(SecretRef::Inline(
+            "rtsp://user:pass@camera/stream".to_string(),
+        ));
 
         assert_eq!(source.describe(), "rtsp");
     }

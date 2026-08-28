@@ -22,8 +22,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     config::{ChromiumConfig, Source, Tab},
-    niri,
-    player,
+    niri, player,
     state::AppState,
 };
 
@@ -33,6 +32,21 @@ const PROFILE_DIRECTORY: &str = "chromium-profile";
 
 /// The tab the daemon opens for itself. It is not in `tabs.toml` and never appears in a playlist.
 const ALERT_TAB: &str = "missiond:alert";
+
+/// The full-screen agenda, which a button somewhere else puts up and takes away again.
+pub const CALENDAR_TAB: &str = "missiond:calendar";
+
+/// The page a built-in tab shows, or nothing if the id names a tab from `tabs.toml`.
+///
+/// One page serves all of these. Which presentation it draws is the query it is opened with, so
+/// adding one is a name here rather than a second bundle for the browser to load.
+fn own_page(tab_id: &str) -> Option<&'static str> {
+    match tab_id {
+        ALERT_TAB => Some("notify.html"),
+        CALENDAR_TAB => Some("notify.html?agenda=1"),
+        _ => None,
+    }
+}
 
 /// Chromium records the owning instance as a `<hostname>-<pid>` symlink at `SingletonLock`.
 fn lock_owner(profile: &std::path::Path) -> Option<u32> {
@@ -54,7 +68,10 @@ fn is_alive(pid: u32) -> bool {
 fn clear_stale_locks(profile: &std::path::Path) {
     if let Some(pid) = lock_owner(profile) {
         if is_alive(pid) {
-            warn!("chromium {pid} still holds {}, leaving its lock alone", profile.display());
+            warn!(
+                "chromium {pid} still holds {}, leaving its lock alone",
+                profile.display()
+            );
 
             return;
         }
@@ -184,7 +201,10 @@ impl ChromeController {
         self.activate_default_playlist(app_state).await
     }
 
-    fn build_browser_config(config: &ChromiumConfig, cache: &std::path::Path) -> Result<BrowserConfig> {
+    fn build_browser_config(
+        config: &ChromiumConfig,
+        cache: &std::path::Path,
+    ) -> Result<BrowserConfig> {
         let mut builder = BrowserConfig::builder()
             .chrome_executable(
                 config
@@ -271,7 +291,8 @@ impl ChromeController {
         clear_stale_locks(&profile);
         super::mark_clean_exit(&profile);
 
-        let (browser, mut handler) = Browser::launch(Self::build_browser_config(config, cache)?).await?;
+        let (browser, mut handler) =
+            Browser::launch(Self::build_browser_config(config, cache)?).await?;
 
         tokio::spawn(async move {
             while let Some(event) = handler.next().await {
@@ -522,11 +543,15 @@ impl ChromeController {
             self.set_capture_rate(&previous, None).await;
         }
 
-        self.set_capture_rate(tab_id, Some(capture::FOREGROUND_FPS)).await;
+        self.set_capture_rate(tab_id, Some(capture::FOREGROUND_FPS))
+            .await;
 
         let tabs = app_state.config.playlist_tabs(playlist_id).await;
 
-        app_state.hass.publish_tab_options(&tabs, Some(tab_id)).await;
+        app_state
+            .hass
+            .publish_tab_options(&tabs, Some(tab_id))
+            .await;
 
         if let Some(tab) = tab {
             app_state.hass.publish_url(tab.source.describe()).await;
@@ -632,20 +657,20 @@ impl ChromeController {
         Ok(())
     }
 
-    /// The alert page is not in `tabs.toml`; the daemon serves it and opens it on demand.
+    /// The daemon's own pages are not in `tabs.toml`; it serves them and opens them on demand.
     async fn ensure_page(&self, tab_id: &str, app_state: &Arc<AppState>) {
-        if tab_id == ALERT_TAB {
-            let alert = Tab {
-                tab_id: ALERT_TAB.to_string(),
+        if let Some(page) = own_page(tab_id) {
+            let own = Tab {
+                tab_id: tab_id.to_string(),
                 name: None,
                 persist: false,
                 scale: None,
                 stinger: None,
-                source: Source::Url(self.own_url(app_state, "notify.html").await),
+                source: Source::Url(self.own_url(app_state, page).await),
             };
 
-            if let Err(error) = self.recreate_from(&alert).await {
-                warn!("failed to open the alert page: {error}");
+            if let Err(error) = self.recreate_from(&own).await {
+                warn!("failed to open {tab_id}: {error}");
             }
 
             return;
@@ -690,7 +715,12 @@ impl ChromeController {
             return None;
         };
 
-        let file = app_state.config.dirs.config.join("media").join(&stinger.file);
+        let file = app_state
+            .config
+            .dirs
+            .config
+            .join("media")
+            .join(&stinger.file);
 
         match app_state.overlay.start(&file, &config.device.mpv).await {
             Ok(()) => Some(stinger.max_duration.into()),
@@ -750,7 +780,9 @@ impl ChromeController {
 
         let page = {
             let browser = self.browser.lock().await;
-            let browser = browser.as_ref().ok_or_else(|| anyhow!("browser not ready"))?;
+            let browser = browser
+                .as_ref()
+                .ok_or_else(|| anyhow!("browser not ready"))?;
 
             browser.new_page(url.as_str()).await?
         };
@@ -842,7 +874,11 @@ impl ChromeController {
             return;
         };
 
-        if preview.task.as_ref().is_some_and(|task| !task.is_finished()) {
+        if preview
+            .task
+            .as_ref()
+            .is_some_and(|task| !task.is_finished())
+        {
             return;
         }
 
@@ -1052,7 +1088,6 @@ fn align_to_wall_clock(interval: Duration) -> Duration {
     }
 }
 
-
 /// `--kiosk` covers the output but leaves the tab strip and omnibox drawn, because a target
 /// created through CDP is a tab and a tab needs somewhere to live. Putting the window itself into
 /// fullscreen is the presentation change `F11` makes, and that does hide them.
@@ -1067,7 +1102,9 @@ async fn go_fullscreen(page: &Page) -> Result<()> {
 
     page.execute(SetWindowBoundsParams::new(
         window.window_id,
-        Bounds::builder().window_state(WindowState::Fullscreen).build(),
+        Bounds::builder()
+            .window_state(WindowState::Fullscreen)
+            .build(),
     ))
     .await?;
 

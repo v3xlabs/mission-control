@@ -7,25 +7,16 @@ use crate::{niri, state::AppState};
 
 use super::Surface;
 
-/// The agenda and alert rail, in a column beside whatever the playlist is showing.
-///
-/// Making room is the daemon's job rather than the compositor's. niri scrolls its columns instead
-/// of shrinking them, so a rail that is merely opened lands off the side of the output. The
-/// display browser is narrowed to the remainder, and put into windowed fullscreen first: Chromium
-/// hides its tab strip and its omnibox only while it believes it is fullscreen, and a window that
-/// really is fullscreen covers the output rather than sharing it.
+/// niri scrolls its columns instead of shrinking them, so a rail that is merely opened lands off
+/// the side of the output. Narrowing the display browser to the remainder is the daemon's job.
 pub struct Sidebar {
     surface: Surface,
-    /// The display browser as it was before the rail made room, so closing puts it back.
     narrowed: Mutex<Option<Narrowed>>,
 }
 
 struct Narrowed {
     window_id: u64,
-    /// The width the display had before the rail took some, so closing does not have to ask the
-    /// compositor again on a path where the answer would be a warning nobody reads.
     full_width: u32,
-    /// Whether the browser was taken out of a real fullscreen to be tiled.
     was_fullscreen: bool,
 }
 
@@ -75,8 +66,8 @@ impl Sidebar {
             warn!("could not set the sidebar width: {error}");
         }
 
-        // The content keeps the focus. A focused rail draws the compositor's focus ring around
-        // itself and takes the keyboard away from a page that may want it.
+        // A focused rail draws the compositor's focus ring around itself and takes the keyboard
+        // away from the page.
         if let Some(narrowed) = self.narrowed.lock().await.as_ref() {
             if let Err(error) = niri::focus_id(narrowed.window_id).await {
                 warn!("could not give the display back the focus: {error}");

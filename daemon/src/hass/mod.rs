@@ -40,10 +40,7 @@ impl HassManager {
             .mqtt_url
             .parse::<Url>()
             .with_context(|| format!("cannot parse mqtt_url {}", config.mqtt_url))?;
-        let host = url
-            .host_str()
-            .context("mqtt_url has no host")?
-            .to_string();
+        let host = url.host_str().context("mqtt_url has no host")?.to_string();
         let port = url.port().unwrap_or(1883);
 
         let availability_topic = format!("homeassistant/device/{}/availability", device.device_id);
@@ -227,7 +224,13 @@ impl HassManager {
                 warn!("failed to activate playlist {payload}: {error}");
             }
         } else if topic == self.tab_entity.command_topic {
-            let playlist_id = app_state.chrome.state.lock().await.current_playlist_id.clone();
+            let playlist_id = app_state
+                .chrome
+                .state
+                .lock()
+                .await
+                .current_playlist_id
+                .clone();
 
             if let Some(playlist_id) = playlist_id {
                 if let Err(error) = tell(

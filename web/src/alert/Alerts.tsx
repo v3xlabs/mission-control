@@ -4,17 +4,29 @@ import { AlertCard } from "./AlertCard";
 import type { Alert } from "./useAlerts";
 import { useAlerts } from "./useAlerts";
 
-type Presentation = Alert["mode"];
+export type Presentation = "takeover" | "sidebar" | "toast" | "agenda";
 
-/**
- * One page serves all three presentations, and each shows only what is addressed to it. Rendering
- * the whole list everywhere puts the agenda underneath a doorbell alert and counts the wrong
- * things in "and 2 more".
- */
+/** The agenda is the rail's content at the size of a wall, so it has no mode of its own. */
+const shows = (presentation: Presentation, alert: Alert) => {
+  if (presentation === "agenda") {
+    return alert.mode === "sidebar";
+  }
+
+  return alert.mode === presentation;
+};
+
 export const Alerts: FC<{ presentation: Presentation; }> = ({ presentation }) => {
-  const alerts = useAlerts().filter(alert => alert.mode === presentation);
+  const alerts = useAlerts().filter(alert => shows(presentation, alert));
 
   if (alerts.length === 0) {
+    if (presentation === "agenda") {
+      return (
+        <main className="flex h-screen w-screen items-center justify-center bg-gray-950">
+          <p className="text-4xl text-gray-600">Nothing scheduled</p>
+        </main>
+      );
+    }
+
     return <main className="h-screen w-screen bg-gray-950" />;
   }
 
@@ -26,8 +38,15 @@ export const Alerts: FC<{ presentation: Presentation; }> = ({ presentation }) =>
     );
   }
 
-  // A toast is one thing in a corner. The card fills the window, because the daemon sized that
-  // window for it and a card floating inside leaves bands of background around the message.
+  if (presentation === "agenda") {
+    return (
+      <main className="flex h-screen w-screen flex-col gap-4 overflow-y-auto bg-gray-950 p-10">
+        {alerts.map(alert => <AlertCard key={alert.notification_id} alert={alert} isLarge={false} isWide />)}
+      </main>
+    );
+  }
+
+  // The card fills the window, which the daemon has already sized for one toast.
   if (presentation === "toast") {
     const [newest] = alerts.slice(-1);
 
@@ -38,8 +57,6 @@ export const Alerts: FC<{ presentation: Presentation; }> = ({ presentation }) =>
     );
   }
 
-  // A takeover shows one thing. Anything else queued is a count, not a second card competing
-  // for the same wall.
   const [newest] = alerts.slice(-1);
 
   return (

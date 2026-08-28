@@ -14,8 +14,9 @@ pub enum SecretRef {
 impl SecretRef {
     pub fn resolve(&self) -> Result<String> {
         match self {
-            Self::Env { env } => std::env::var(env)
-                .map_err(|_| anyhow!("environment variable {env} is not set")),
+            Self::Env { env } => {
+                std::env::var(env).map_err(|_| anyhow!("environment variable {env} is not set"))
+            }
             Self::File { file } => std::fs::read_to_string(file)
                 .map(|body| body.trim().to_string())
                 .with_context(|| format!("cannot read secret from {file}")),

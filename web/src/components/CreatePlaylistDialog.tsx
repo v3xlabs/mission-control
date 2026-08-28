@@ -27,7 +27,7 @@ export const CreatePlaylistDialog: FC = () => {
               <input
                 value={playlistId}
                 onChange={event => setPlaylistId(event.target.value)}
-                placeholder="mission-display"
+                placeholder="lobby"
                 className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
             </label>
@@ -36,7 +36,7 @@ export const CreatePlaylistDialog: FC = () => {
               <input
                 value={name}
                 onChange={event => setName(event.target.value)}
-                placeholder="Mission Display"
+                placeholder="Lobby"
                 className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
             </label>

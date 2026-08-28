@@ -96,11 +96,15 @@ tab strip to live in and drags the window back to its decorated form, so the dae
 window itself into fullscreen through `Browser.setWindowBounds`. That is the presentation change
 `F11` makes, and it is what actually hides the browser interface.
 
-Setting it to `false` starts a maximised window the compositor tiles instead. A full-screen window
-is not subject to the space a layer surface reserves, so a reserved overlay sidebar will need this
-off. It is off by default only once something draws overlays, because a tiled window on niri opens
-at its column width, which is half the screen, and shows the browser's full interface. If you turn
-it off today, add a niri window rule:
+Leave it on. The sidebar does not need it off: while the rail is open the daemon puts the browser
+into the compositor's windowed fullscreen, so Chromium keeps believing it is fullscreen and keeps
+drawing no interface, while the compositor tiles it beside the rail. See
+[How the rail gets its column](#how-the-rail-gets-its-column).
+
+Setting it to `false` starts a maximised window the compositor tiles instead, and the browser draws
+its tab strip and its omnibox on the display for as long as it runs. That is only worth doing to
+see what the page looks like at a size the display never uses. If you do turn it off, a tiled
+window on niri opens at its column width, which is half the screen, so add a window rule:
 
 ```kdl
 window-rule {
@@ -152,9 +156,9 @@ does not keep it on until Monday.
 version = 1
 
 [[tabs]]
-tab_id = "grafana-overview"
+tab_id = "overview"
 name = "Overview"
-url = "http://127.0.0.1:3001/d/mission-overview?kiosk"
+url = "https://grafana.example.com/d/overview?kiosk"
 persist = true
 scale = 1.25
 ```
@@ -177,12 +181,12 @@ is an ordinary tab: it sits in a playlist, it rotates, and an alert can take ove
 
 ```toml
 [[tabs]]
-tab_id = "front-door"
-name = "Front door"
+tab_id = "entrance-camera"
+name = "Entrance"
 stinger = "doorbell"
 
 [tabs.rtsp]
-file = "/run/secrets/front-door-rtsp-url"
+file = "/run/secrets/entrance-camera-url"
 ```
 
 The file holds the whole url on one line, credential included:
@@ -229,13 +233,13 @@ put whatever page is behind it on screen instead.
 version = 1
 
 [[playlists]]
-playlist_id = "mission-display"
-name = "Mission Display"
+playlist_id = "lobby"
+name = "Lobby"
 interval = "1m"
 hold = "5m"
 is_default = true
-tabs = ["grafana-overview", "homelab-uptime", "indexer-prices"]
-disabled_tabs = ["indexer-prices"]
+tabs = ["overview", "uptime", "departures"]
+disabled_tabs = ["departures"]
 ```
 
 | Field | Type | Notes |
@@ -341,6 +345,8 @@ version = 1
 mode = "takeover"
 default_duration = "20s"
 sidebar_width = 480
+toast_width = 420
+toast_height = 180
 
 [stingers.doorbell]
 file = "doorbell.webm"
@@ -349,21 +355,55 @@ max_duration = "2s"
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `mode` | `takeover` or `sidebar` | What an alert does by default. A single alert can override it. |
+| `mode` | `takeover`, `sidebar` or `toast` | What an alert does by default. A single alert can override it. |
 | `default_duration` | duration | How long an alert stays up when the caller does not say. |
-| `sidebar_width` | integer | How wide the sidebar window asks to be. The compositor has the final say. |
+| `sidebar_width` | integer | How wide the rail is, in logical pixels. The daemon narrows the display by this much and gives the column the remainder. |
+| `toast_width`, `toast_height` | integer | The size of the toast window, in logical pixels. |
 | `stingers` | table | Named clips, keyed by the name a tab or an alert refers to. |
 
-### takeover and sidebar
+### takeover, sidebar and toast
 
 **Takeover** makes the alert the thing on screen. Rotation stops, and when the alert expires the
 display returns to the tab it interrupted rather than to wherever rotation would have reached.
 
-**Sidebar** opens the alert as its own window beside the content and leaves the playlist running.
-It is a second browser window in Chromium's app mode, not a layer-shell surface: the compositor is
-already a tiling one, so it opens, gets a column, and the display shrinks to make room. The window
-carries its own app id, `missiond-sidebar`, so a window rule can place or size it, and its own
-profile, so it cannot disturb the display's.
+**Sidebar** opens the alert on a rail beside the content and leaves the playlist running.
+
+**Toast** opens it over a corner of the content. Nothing is resized and nothing is interrupted,
+which is what a meeting five minutes away is worth. The toast holds the focus while it is up,
+because a floating window sits behind a fullscreen one otherwise.
+
+All three are pages the daemon serves to itself. The rail and the toast are second browser windows
+in Chromium's app mode rather than layer-shell surfaces, because the compositor is already a tiling
+one and speaks an IPC the daemon can drive.
+
+#### How the rail gets its column
+
+Three things have to be true, and the daemon does all of them through niri's IPC. None of them
+needs a window rule in your niri configuration.
+
+niri scrolls its columns rather than shrinking them, so a rail that is merely opened lands off the
+side of the output. The daemon sets both widths itself: the display gets the output width minus
+`sidebar_width`, and the rail gets the rest.
+
+A window that is really fullscreen covers the output rather than sharing it, and Chromium hides its
+tab strip and its omnibox only while it believes it is fullscreen. The daemon puts the display into
+niri's windowed fullscreen for as long as the rail is open, so the browser keeps drawing no
+interface while the compositor keeps tiling it. That is why `chromium.fullscreen` can stay on.
+
+Chromium ignores `--class` on an `--app` window and derives an app id from the URL, so neither
+window carries a name you chose. The daemon finds them by the process it started instead, which is
+exact and needs nothing configured.
+
+#### Toggling the rail
+
+```bash
+curl -X POST http://display.example:3000/api/sidebar/toggle \
+  -H "authorization: Bearer $MISSIOND_ADMIN_KEY"
+```
+
+One call, and the daemon decides which way. The answer says where it ended up, so a button
+somewhere else needs no state of its own. A rail closed by hand stays closed until something new
+arrives for it, rather than reopening on the next expiry.
 
 ### Stingers
 
@@ -377,7 +417,7 @@ a window it does not own.
 
 ```toml
 [[tabs]]
-tab_id = "front-door"
+tab_id = "entrance-camera"
 url = "http://camera.example/stream"
 stinger = "doorbell"
 ```
@@ -445,10 +485,10 @@ curl -X POST http://display.example:3000/api/notify \
   -H "authorization: Bearer $MISSIOND_ADMIN_KEY" \
   -H 'content-type: application/json' \
   -d '{
-        "title": "Front door",
+        "title": "Entrance",
         "body": "Someone is at the door",
         "level": "warning",
-        "tab_id": "front-door",
+        "tab_id": "entrance-camera",
         "stinger": "doorbell",
         "duration": "30s"
       }'
@@ -460,16 +500,97 @@ curl -X POST http://display.example:3000/api/notify \
 | `level` | `info`, `warning` or `critical`. Colours one edge of the card. |
 | `mode` | Overrides `mode` for this alert. |
 | `duration` | Overrides `default_duration`. |
-| `tab_id` | Show this tab instead of a card. This is what turns a doorbell alert into the camera feed rather than the word "doorbell". |
+| `tab_id` | Show this tab instead of a card, so an alert about a camera puts the stream on screen rather than a sentence describing it. |
 | `stinger` | A clip to cover the change. |
+| `key` | Two calls carrying one key are one alert said twice: the second replaces the first rather than stacking beside it. An automation that fires on every door event gets this for free. |
+| `starts_at`, `ends_at` | RFC 3339. What the alert is about, so the card shows a time and counts down to it. |
+| `location` | A room, shown under the title. |
 
 The call returns as soon as the alert is queued. A transition can take seconds and the caller is
-usually a doorbell or an automation, so it is not held open while the screen changes.
+usually an automation, so it is not held open while the screen changes.
 
 | Method | Path | Does |
 | --- | --- | --- |
 | POST | `/api/notify` | Raise an alert. |
-| GET | `/api/notifications` | What is currently showing. The alert pages read this. |
+| GET | `/api/notifications` | What is currently showing. |
+| GET | `/api/notifications/stream` | The same list as a server sent event stream. The alert pages read this. |
 | DELETE | `/api/notifications/:notification_id` | Clear one early. |
+| POST | `/api/sidebar/toggle` | Open the rail if it is closed, close it if it is open. |
+| GET | `/api/sidebar` | Whether the rail is up. |
+| POST | `/api/calendar/toggle` | Put the full-screen agenda on the display, or take it away. |
+| GET | `/api/calendar/agenda` | The entries the feeds put in their window. |
 | GET | `/api/stingers` | The configured clips, so the transition page can resolve a name. |
 | GET | `/api/media/:name` | A file from the config directory's `media`. |
+
+## calendars.toml
+
+```toml
+version = 1
+poll = "1m"
+
+[[calendars]]
+calendar_id = "work"
+name = "Work"
+refresh = "15m"
+window = "12h"
+leads = ["5m", "0s"]
+toast_duration = "45s"
+
+[calendars.url]
+file = "/run/secrets/work-ics"
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `poll` | duration | How often the rail is reconciled against what has already been fetched. |
+| `calendar_id` | string | Names the feed, and is part of every key its entries carry. |
+| `name` | string | What a message about the feed calls it. Defaults to the id. |
+| `url` | secret | Where the `.ics` is. See [Secrets](#secrets). |
+| `refresh` | duration | How often the daemon goes back to the network. |
+| `window` | duration | How far ahead the rail reaches, and how far recurrence expansion runs. |
+| `leads` | list of durations | How long before an entry starts to raise a toast. One toast per lead. |
+| `toast_duration` | duration | How long each of those toasts stays up. |
+
+A calendar's `.ics` link is a bearer credential: anyone holding it reads the calendar. So `url`
+takes the same reference an RTSP camera does, and `GET /api/config/export` replaces an inline one
+with `MISSIOND_CALENDAR_<ID>` rather than printing it.
+
+`poll` and `refresh` are separate on purpose. The rail has to stay correct to the minute, because
+"in 3 minutes" is wrong a minute later, and asking a calendar server that often to learn something
+it has not changed would be rude and slower than reading what is already in memory.
+
+### What reaches the screen
+
+An entry is on the rail from the moment it falls inside `window` until it ends, which makes this an
+agenda rather than a stack of reminders. Each entry drops itself the minute its meeting finishes,
+whether or not a poll runs first.
+
+A toast goes up at each of `leads`. With the default `["5m", "0s"]` that is one five minutes out and
+one as the meeting begins. The window a toast is up for is absolute, `start - lead` to
+`toast_duration` later, rather than a crossing the daemon has to remember, so a restart at four
+minutes past arrives at the same answer as a daemon that has been running all morning.
+
+Recurrence is expanded in the feed's own timezone. A rule expanded in UTC and converted afterwards
+drifts by an hour at each daylight saving boundary, so a standup that is 09:00 all year would start
+reading as 08:00 from late October.
+
+### When a feed stops answering
+
+The last body that parsed is kept under the cache directory, one file per `calendar_id`, and a
+failed fetch falls back to it. A display is on a wall and a network blip is common: an agenda that
+blanks itself for a minute reads as broken in a way that a fifteen minute old one does not.
+
+While the daemon is serving a cached body it puts one row on the rail saying so. A feed that has
+never fetched successfully has nothing to fall back to, and an empty rail is indistinguishable from
+an empty afternoon, so that case says so too.
+
+### The full-screen agenda
+
+```bash
+curl -X POST http://display.example:3000/api/calendar/toggle \
+  -H "authorization: Bearer $MISSIOND_ADMIN_KEY"
+```
+
+The first call puts the whole day on the display and holds it there. The hold has no end, so it
+stays until the second call rather than for a duration the caller had to guess. Ending it returns
+to the tab the playlist was showing, the same way a takeover does.

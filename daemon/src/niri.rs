@@ -10,9 +10,9 @@ use tokio::{
     io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader},
     net::UnixStream,
 };
+use tracing::debug;
 
-/// A window opens while the call that asked for it has already been answered, so the first look at
-/// the window list is usually too early.
+/// A window appears in the list some time after the call that asked for it has been answered.
 const ATTEMPTS: usize = 30;
 const POLL: Duration = Duration::from_millis(100);
 
@@ -26,18 +26,12 @@ pub struct Window {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Layout {
-    /// Width and height in logical pixels, which is what a window actually occupies rather than
-    /// what it was asked for.
+    /// Logical pixels.
     pub window_size: [u32; 2],
 }
 
-/// Focuses the window carrying `app_id`.
-///
-/// niri holds every window in one scrolling layout, and it hands the focus to a new window only
-/// when the client can show that a person opened it. A player started by a daemon cannot, so the
-/// camera window arrives in a column beside the browser and stays off the panel until something
-/// focuses it. niri answers json on the socket it names in `NIRI_SOCKET`, which is cheaper than a
-/// shell script and needs nothing on the daemon's PATH.
+/// niri hands the focus to a new window only when the client can show that a person opened it. A
+/// window the daemon started cannot, so it stays off the panel until something focuses it.
 pub async fn focus(app_id: &str) -> Result<()> {
     let socket = socket()?;
     let window = wait_for(&socket, &by_app_id(app_id)).await?;
@@ -45,34 +39,30 @@ pub async fn focus(app_id: &str) -> Result<()> {
     focus_window(&socket, window.id).await
 }
 
-/// Lifts the window carrying `app_id` out of the tiling layout and focuses it.
-///
-/// niri draws a floating window over the tiled ones, which is the only stacking it offers a
-/// client that cannot speak layer-shell. The focus goes with it, because a fullscreen window
-/// covers floating windows while it is the focused one, and the camera is fullscreen.
+/// Floating is the only stacking niri offers a client that cannot speak layer-shell. The focus
+/// goes with it, because a focused fullscreen window covers floating ones.
 pub async fn float(app_id: &str) -> Result<()> {
     let socket = socket()?;
     let id = wait_for(&socket, &by_app_id(app_id)).await?.id;
 
-    request(&socket, &json!({ "Action": { "MoveWindowToFloating": { "id": id } } })).await?;
+    request(
+        &socket,
+        &json!({ "Action": { "MoveWindowToFloating": { "id": id } } }),
+    )
+    .await?;
     focus_window(&socket, id).await
 }
 
-/// The window belonging to a process the daemon started.
-///
 /// Chromium derives the app id of an `--app=` window from its URL and ignores `--class`, so a
-/// window opened for a surface cannot be found by a name the daemon chose. The process id can,
-/// and the daemon owns the child either way.
+/// window opened for a surface cannot be found by a name the daemon chose.
 pub async fn wait_for_pid(pid: u32) -> Result<Window> {
     let socket = socket()?;
 
     wait_for(&socket, &|window: &Window| window.pid == Some(pid as i32)).await
 }
 
-/// Sets a window's width in logical pixels.
-///
-/// This is what makes a configured sidebar width mean something. A tiling compositor sizes the
-/// column itself, so `--window-size` on the client is a request nothing reads.
+/// Logical pixels. A tiling compositor sizes the column itself, so `--window-size` on the client
+/// is a request nothing reads.
 pub async fn set_width(id: u64, pixels: u32) -> Result<()> {
     request(
         &socket()?,
@@ -83,7 +73,7 @@ pub async fn set_width(id: u64, pixels: u32) -> Result<()> {
     Ok(())
 }
 
-/// Sets a window's height in logical pixels. Only a floating window has a height of its own.
+/// Logical pixels. Only a floating window has a height of its own.
 pub async fn set_height(id: u64, pixels: u32) -> Result<()> {
     request(
         &socket()?,
@@ -94,12 +84,9 @@ pub async fn set_height(id: u64, pixels: u32) -> Result<()> {
     Ok(())
 }
 
-/// Makes a window fullscreen as far as the client is concerned while the compositor keeps it in
-/// the tiling layout.
-///
-/// Chromium hides its tab strip and its omnibox only when it believes it is fullscreen, and a
-/// really fullscreen window covers the output rather than sharing it. Windowed fullscreen is what
-/// lets the display keep a browser with no interface and still make room for a column beside it.
+/// Fullscreen as far as the client is concerned, while the compositor keeps the window in the
+/// tiling layout: Chromium hides its tab strip and its omnibox only when it believes it is
+/// fullscreen, and a really fullscreen window covers the output rather than sharing it.
 ///
 /// niri offers a toggle rather than a setter, so the caller has to know the state it is leaving.
 pub async fn toggle_windowed_fullscreen(id: u64) -> Result<()> {
@@ -112,11 +99,14 @@ pub async fn toggle_windowed_fullscreen(id: u64) -> Result<()> {
     Ok(())
 }
 
-/// Takes a window out of the tiling layout and puts it at a position on the output.
 pub async fn place_floating(id: u64, x: f64, y: f64) -> Result<()> {
     let socket = socket()?;
 
-    request(&socket, &json!({ "Action": { "MoveWindowToFloating": { "id": id } } })).await?;
+    request(
+        &socket,
+        &json!({ "Action": { "MoveWindowToFloating": { "id": id } } }),
+    )
+    .await?;
     request(
         &socket,
         &json!({ "Action": { "MoveFloatingWindow": {
@@ -130,14 +120,11 @@ pub async fn place_floating(id: u64, x: f64, y: f64) -> Result<()> {
     Ok(())
 }
 
-/// Focuses a window the caller has already found.
 pub async fn focus_id(id: u64) -> Result<()> {
     focus_window(&socket()?, id).await
 }
 
-/// The width of an output in logical pixels, which is the unit every window action takes.
-///
-/// `logical` rather than the mode, because a scaled output reports a mode in physical pixels and
+/// `logical` rather than the mode, because a scaled output reports its mode in physical pixels and
 /// a column asked for in those is twice the width it should be.
 pub async fn output_width(name: Option<&str>) -> Result<u32> {
     #[derive(Deserialize)]
@@ -158,8 +145,6 @@ pub async fn output_width(name: Option<&str>) -> Result<u32> {
             .ok_or_else(|| anyhow!("niri answered an output list request with something else"))?,
     )?;
 
-    // Without a configured output name there is nothing to choose by, and a display with one
-    // screen is the case this serves.
     match name {
         Some(name) => outputs
             .get(name)
@@ -184,7 +169,11 @@ fn socket() -> Result<PathBuf> {
 }
 
 async fn focus_window(socket: &Path, id: u64) -> Result<()> {
-    request(socket, &json!({ "Action": { "FocusWindow": { "id": id } } })).await?;
+    request(
+        socket,
+        &json!({ "Action": { "FocusWindow": { "id": id } } }),
+    )
+    .await?;
 
     Ok(())
 }
@@ -214,7 +203,21 @@ async fn find(socket: &Path, matches: &impl Fn(&Window) -> bool) -> Result<Optio
 }
 
 /// One request, one reply, one connection: niri closes the socket once it has answered.
+/// Retried once. niri has been seen accepting a connection and closing it without answering while
+/// several windows are opening and closing at once. Losing that request leaves the display
+/// narrowed with nothing beside it, which is a wrong screen rather than a missing log line.
 async fn request(socket: &Path, payload: &Value) -> Result<Value> {
+    match request_once(socket, payload).await {
+        Ok(reply) => Ok(reply),
+        Err(first) => {
+            debug!("retrying a niri request: {first}");
+
+            request_once(socket, payload).await
+        }
+    }
+}
+
+async fn request_once(socket: &Path, payload: &Value) -> Result<Value> {
     let mut stream = UnixStream::connect(socket)
         .await
         .context("niri is not listening")?;
@@ -258,7 +261,6 @@ mod tests {
         dir.join("niri.sock")
     }
 
-    /// Reads the request off one connection and answers it, the way niri does.
     async fn exchange(listener: &UnixListener, reply: &Value) -> Value {
         let (stream, _) = listener.accept().await.unwrap();
         let mut reader = BufReader::new(stream);
@@ -268,7 +270,10 @@ mod tests {
 
         let mut stream = reader.into_inner();
 
-        stream.write_all(reply.to_string().as_bytes()).await.unwrap();
+        stream
+            .write_all(reply.to_string().as_bytes())
+            .await
+            .unwrap();
         stream.write_all(b"\n").await.unwrap();
 
         serde_json::from_str(&line).unwrap()
@@ -295,7 +300,9 @@ mod tests {
             (listed, acted)
         });
 
-        let window = wait_for(&socket, &by_app_id("missiond-camera")).await.unwrap();
+        let window = wait_for(&socket, &by_app_id("missiond-camera"))
+            .await
+            .unwrap();
 
         focus_window(&socket, window.id).await.unwrap();
 
@@ -305,8 +312,6 @@ mod tests {
         assert_eq!(acted, json!({"Action": {"FocusWindow": {"id": 7}}}));
     }
 
-    /// Chromium ignores `--class` on an `--app` window and derives an app id from the URL, so the
-    /// process is the only handle the daemon has on a surface it opened.
     #[tokio::test]
     async fn a_window_is_found_by_the_process_that_owns_it() {
         let socket = scratch("pid");
@@ -332,6 +337,8 @@ mod tests {
             exchange(&listener, &json!({"Err": "unknown request"})).await;
         });
 
-        assert!(wait_for(&socket, &by_app_id("missiond-camera")).await.is_err());
+        assert!(wait_for(&socket, &by_app_id("missiond-camera"))
+            .await
+            .is_err());
     }
 }

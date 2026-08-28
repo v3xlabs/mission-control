@@ -61,7 +61,7 @@ export const AddTabDialog: FC<{ playlistId: string; }> = ({ playlistId }) => {
               <input
                 value={tabId}
                 onChange={event => setTabId(event.target.value)}
-                placeholder="grafana-overview"
+                placeholder="overview"
                 className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
             </label>
@@ -79,7 +79,7 @@ export const AddTabDialog: FC<{ playlistId: string; }> = ({ playlistId }) => {
               <input
                 value={url}
                 onChange={event => setUrl(event.target.value)}
-                placeholder="http://127.0.0.1:3001/d/overview?kiosk"
+                placeholder="https://grafana.example.com/d/overview?kiosk"
                 className="mt-1 w-full border border-gray-800 bg-gray-900 px-2 py-1 text-gray-100"
               />
             </label>

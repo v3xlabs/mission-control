@@ -155,7 +155,10 @@ impl HassEntity {
     }
 
     pub async fn subscribe(&self, client: &AsyncClient) {
-        if let Err(error) = client.subscribe(&self.command_topic, QoS::AtLeastOnce).await {
+        if let Err(error) = client
+            .subscribe(&self.command_topic, QoS::AtLeastOnce)
+            .await
+        {
             warn!("cannot subscribe to {}: {error}", self.command_topic);
         }
     }

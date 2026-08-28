@@ -34,3 +34,4 @@ rust-embed = "8.0.0"
 mime_guess = "2.0.4"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"] }
 async-trait = "0.1"
+icalendar = { version = "0.17.13", features = ["recurrence"] }

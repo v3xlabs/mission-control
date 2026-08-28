@@ -9,7 +9,6 @@ use crate::{
 
 use super::{ApiError, ApiResult};
 
-/// One endpoint everything can reach: a Home Assistant automation, a Stream Deck key, a CI job.
 #[derive(Debug, Clone, Serialize, Deserialize, Object)]
 pub struct NotifyRequest {
     pub title: String,
@@ -20,14 +19,13 @@ pub struct NotifyRequest {
     /// A duration such as `20s`. Falls back to the configured default.
     pub duration: Option<String>,
     /// Two calls carrying one key are one alert said twice: the second replaces the first rather
-    /// than stacking beside it. An automation that fires on every door event gets this for free.
+    /// than stacking beside it.
     pub key: Option<String>,
     /// When the thing this alert is about happens, so the card can show a time and count down.
     pub starts_at: Option<DateTime<Local>>,
     pub ends_at: Option<DateTime<Local>>,
     pub location: Option<String>,
-    /// Show this tab rather than a message card, which is what turns a doorbell alert into the
-    /// camera feed instead of the word "doorbell".
+    /// Show this tab rather than a message card.
     pub tab_id: Option<String>,
     /// A clip to cover the change, by name from `notifications.toml`.
     pub stinger: Option<String>,

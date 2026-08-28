@@ -8,6 +8,7 @@ pub mod response;
 pub mod state;
 
 pub use controller::ChromeController;
+pub use controller::CALENDAR_TAB;
 pub use message::ChromeMessage;
 pub use preview::Preview;
 pub use profile::mark_clean_exit;

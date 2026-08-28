@@ -100,6 +100,11 @@
       playlists = dropNulls (namedList "playlist_id" cfg.settings.playlists);
     }} "$out/playlists.toml"
     ln -s ${toml.generate "notifications.toml" (dropNulls ({version = 1;} // cfg.settings.notifications))} "$out/notifications.toml"
+    ln -s ${toml.generate "calendars.toml" (dropNulls ({
+        version = 1;
+        calendars = dropNulls (namedList "calendar_id" cfg.settings.calendars);
+      }
+      // cfg.settings.calendarDefaults))} "$out/calendars.toml"
 
     # A stinger clip is a build input like anything else, so the media directory is assembled
     # here rather than left for someone to copy onto the machine by hand.
@@ -230,7 +235,7 @@ in {
             default = {};
             example = lib.literalExpression ''
               {
-                grafana-overview.url = "http://127.0.0.1:3001/d/mission-overview?kiosk";
+                overview.url = "https://grafana.example.com/d/overview?kiosk";
               }
             '';
             description = "Tabs, keyed by tab id.";
@@ -250,6 +255,45 @@ in {
               }
             '';
             description = "Alert behaviour and the named stinger clips.";
+          };
+
+          calendars = lib.mkOption {
+            type = passthrough;
+            default = {};
+            example = lib.literalExpression ''
+              {
+                work = {
+                  name = "Work";
+                  url.file = config.sops.secrets.work_ics.path;
+                  refresh = "15m";
+                  window = "12h";
+                  leads = ["5m" "0s"];
+                };
+              }
+            '';
+            description = ''
+              iCalendar feeds, keyed by calendar id. Each one appears on the rail as it comes
+              into `window`, and raises a toast at each of its `leads`.
+
+              A feed's address is the credential for it, so `url` takes the same reference an
+              RTSP camera does: `url.file` for a path, `url.env` for an environment variable, or
+              a plain string when the link is not a secret.
+            '';
+          };
+
+          calendarDefaults = lib.mkOption {
+            type = passthrough;
+            default = {};
+            example = lib.literalExpression ''
+              {
+                poll = "1m";
+              }
+            '';
+            description = ''
+              Values at the top of `calendars.toml`, which is `poll`: how often the rail is
+              reconciled against what has already been fetched. Separate from a feed's `refresh`,
+              which is how often the daemon goes back to the network.
+            '';
           };
 
           media = lib.mkOption {
@@ -272,10 +316,10 @@ in {
             default = {};
             example = lib.literalExpression ''
               {
-                mission-display = {
+                lobby = {
                   interval = "1m";
                   is_default = true;
-                  tabs = ["grafana-overview"];
+                  tabs = ["overview"];
                 };
               }
             '';

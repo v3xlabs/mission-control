@@ -1,3 +1,5 @@
+pub mod calendar;
+pub mod calendars;
 pub mod chromium;
 pub mod device;
 pub mod dirs;
@@ -23,6 +25,8 @@ pub mod tabs;
 pub mod version;
 pub mod weekday;
 
+pub use calendar::Calendar;
+pub use calendars::CalendarsDocument;
 pub use chromium::ChromiumConfig;
 pub use device::DeviceDocument;
 pub use dirs::Dirs;

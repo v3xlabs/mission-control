@@ -14,6 +14,10 @@ kiosk:
 lab: web-dist
     ./dev/lab.sh
 
+# Write an .ics into the lab with events a few minutes out.
+lab-ics MINUTES="6":
+    ./dev/make-lab-ics.sh {{MINUTES}}
+
 # Talk to the missiond running in the lab.
 lab-api *ARGS:
     curl -sS -H 'content-type: application/json' http://127.0.0.1:3177/api{{ARGS}}

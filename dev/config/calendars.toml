@@ -1,0 +1,23 @@
+version = 1
+poll = "20s"
+
+# Written by `just lab-ics`, with events a few minutes out, so the rail, the countdown and both
+# toast leads can be watched without waiting for a meeting somebody actually scheduled.
+[[calendars]]
+calendar_id = "lab"
+name = "Lab"
+refresh = "1m"
+window = "12h"
+leads = ["5m", "0s"]
+toast_duration = "45s"
+url = "http://127.0.0.1:3177/api/media/lab.ics"
+
+# Point this at a real feed to check the parser against a calendar nobody wrote for a test. A
+# published .ics link is a bearer credential, so keep yours out of this file: put it in
+# .tmp/lab/config/calendars.toml, which is not tracked.
+# [[calendars]]
+# calendar_id = "real"
+# name = "Real"
+# refresh = "15m"
+# window = "12h"
+# url = "https://calendar.example.com/private/basic.ics"
