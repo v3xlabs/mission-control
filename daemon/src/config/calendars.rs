@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::{version, Calendar, HumanDuration};
+use super::{version, Calendar, HumanDuration, MeetingsConfig};
 
 /// `calendars.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -11,6 +11,8 @@ pub struct CalendarsDocument {
     /// separate from a feed's `refresh` and does not go back to the network.
     #[serde(default = "default_poll")]
     pub poll: HumanDuration,
+    #[serde(default)]
+    pub meetings: MeetingsConfig,
     #[serde(default)]
     pub calendars: Vec<Calendar>,
 }
@@ -24,6 +26,7 @@ impl Default for CalendarsDocument {
         Self {
             version: version::CURRENT,
             poll: default_poll(),
+            meetings: MeetingsConfig::default(),
             calendars: Vec::new(),
         }
     }

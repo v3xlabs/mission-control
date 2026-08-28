@@ -187,6 +187,7 @@ mod tests {
             mode,
             expires_in_seconds: 0,
             starts_at: None,
+            meeting: None,
             ends_at: None,
             location: None,
             tab_id: None,

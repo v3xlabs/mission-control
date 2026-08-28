@@ -1803,7 +1803,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Everything currently showing. The alert pages read this. */
+        /** Everything currently showing. */
         get: {
             parameters: {
                 query?: never;
@@ -1943,11 +1943,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Open the rail if it is closed, close it if it is open.
-         * @description One call, no state to keep at the other end, which is what a button on a launchpad needs.
-         *     A closed rail stays closed until something new arrives for it.
-         */
+        /** Open the rail if it is closed, close it if it is open. A rail closed this way stays closed
+         *     until something new arrives for it. */
         post: {
             parameters: {
                 query?: never;
@@ -2083,11 +2080,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Put the full-screen agenda on the display, or take it away and resume the playlist.
-         * @description The hold has no end, so the agenda stays until the second call rather than for a duration
-         *     the caller had to guess. Ending it returns to the tab the playlist was showing.
-         */
+        /** Put the full-screen agenda on the display, or take it away and resume the playlist. The
+         *     hold has no end: the agenda stays until the second call. */
         post: {
             parameters: {
                 query?: never;
@@ -2265,6 +2259,12 @@ export interface components {
          * @enum {string}
          */
         Level: "info" | "warning" | "critical";
+        /** Meeting */
+        Meeting: {
+            url: string;
+            /** @description A name from `meetings.providers` in `calendars.toml`, so the set is open, not fixed. */
+            provider?: string;
+        };
         /**
          * MutationResult
          * @description What a mutation answers with. `persisted` is false when the config directory is managed
@@ -2291,15 +2291,16 @@ export interface components {
             expires_in_seconds: number;
             /**
              * Format: date-time
-             * @description When the thing this alert is about happens. A calendar entry has one; a doorbell does not,
-             *     and renders the way it does today.
+             * @description When the thing this alert is about happens. An alert without one renders as a message
+             *     rather than as a time.
              */
             starts_at?: string;
             /** Format: date-time */
             ends_at?: string;
             location?: string;
-            /** @description A tab to put on screen instead of a message card. This is what turns a doorbell alert into
-             *     the camera feed rather than the word "doorbell". */
+            meeting?: components["schemas"]["Meeting"];
+            /** @description A tab to put on screen instead of a message card, so an alert about a camera shows the
+             *     stream rather than a sentence describing it. */
             tab_id?: string;
             /** @description A clip played while the alert arrives, by name from `notifications.toml`. */
             stinger?: string;
@@ -2309,10 +2310,7 @@ export interface components {
          * @enum {string}
          */
         NotificationMode: "takeover" | "sidebar" | "toast";
-        /**
-         * NotifyRequest
-         * @description One endpoint everything can reach: a Home Assistant automation, a Stream Deck key, a CI job.
-         */
+        /** NotifyRequest */
         NotifyRequest: {
             title: string;
             body?: string;
@@ -2322,7 +2320,7 @@ export interface components {
             /** @description A duration such as `20s`. Falls back to the configured default. */
             duration?: string;
             /** @description Two calls carrying one key are one alert said twice: the second replaces the first rather
-             *     than stacking beside it. An automation that fires on every door event gets this for free. */
+             *     than stacking beside it. */
             key?: string;
             /**
              * Format: date-time
@@ -2332,8 +2330,7 @@ export interface components {
             /** Format: date-time */
             ends_at?: string;
             location?: string;
-            /** @description Show this tab rather than a message card, which is what turns a doorbell alert into the
-             *     camera feed instead of the word "doorbell". */
+            /** @description Show this tab rather than a message card. */
             tab_id?: string;
             /** @description A clip to cover the change, by name from `notifications.toml`. */
             stinger?: string;

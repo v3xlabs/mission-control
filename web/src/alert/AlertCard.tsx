@@ -1,6 +1,7 @@
 import classNames from "classnames";
 import { type FC } from "react";
 
+import { MeetingIcon } from "./MeetingIcon";
 import type { Alert } from "./useAlerts";
 import { useCountdown } from "./useCountdown";
 
@@ -34,7 +35,10 @@ export const AlertCard: FC<{ alert: Alert; isLarge: boolean; isWide?: boolean; }
           )}
         </div>
         <div className="min-w-0 py-6 pr-6">
-          <h1 className="truncate text-4xl font-semibold text-gray-100">{alert.title}</h1>
+          <div className="flex items-center gap-4">
+            {alert.meeting && <MeetingIcon meeting={alert.meeting} className="size-8 shrink-0" />}
+            <h1 className="truncate text-4xl font-semibold text-gray-100">{alert.title}</h1>
+          </div>
           {alert.location && <p className="mt-2 text-2xl text-gray-500">{alert.location}</p>}
         </div>
       </article>
@@ -55,9 +59,17 @@ export const AlertCard: FC<{ alert: Alert; isLarge: boolean; isWide?: boolean; }
             {relative && <span className="ml-3 text-gray-500">{relative}</span>}
           </p>
         )}
-        <h1 className={classNames("font-semibold text-gray-100", isLarge ? "text-7xl" : "text-xl")}>
-          {alert.title}
-        </h1>
+        <div className={classNames("flex items-center", isLarge ? "gap-5" : "gap-2")}>
+          {alert.meeting && (
+            <MeetingIcon
+              meeting={alert.meeting}
+              className={classNames("shrink-0", isLarge ? "size-14" : "size-5")}
+            />
+          )}
+          <h1 className={classNames("truncate font-semibold text-gray-100", isLarge ? "text-7xl" : "text-xl")}>
+            {alert.title}
+          </h1>
+        </div>
         {alert.body && (
           <p className={classNames("mt-4 text-gray-400", isLarge ? "text-4xl" : "text-base")}>
             {alert.body}

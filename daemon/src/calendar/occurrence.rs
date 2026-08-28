@@ -4,13 +4,16 @@ use chrono::{DateTime, Duration, Local, TimeZone as _};
 use icalendar::{Calendar, Component as _, DatePerhapsTime, Event, EventLike as _};
 use tracing::{debug, warn};
 
-use super::KEY_PREFIX;
+use crate::config::MeetingsConfig;
+
+use super::{meeting, Meeting, KEY_PREFIX};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Occurrence {
     pub uid: String,
     pub summary: String,
     pub location: Option<String>,
+    pub meeting: Option<Meeting>,
     pub start: DateTime<Local>,
     pub end: DateTime<Local>,
 }
@@ -35,6 +38,7 @@ const LIMIT: u16 = 512;
 /// 08:00 from late October.
 pub fn expand(
     calendar: &Calendar,
+    meetings: &MeetingsConfig,
     from: DateTime<Local>,
     until: DateTime<Local>,
 ) -> Vec<Occurrence> {
@@ -48,8 +52,13 @@ pub fn expand(
         };
 
         let summary = event.get_summary().unwrap_or("Untitled").to_string();
-        let location = event.get_location().map(str::to_string);
         let length = length_of(event.event());
+        let meeting = meeting::find(event.event(), meetings);
+        let location = event.get_location().map(str::to_string).filter(|location| {
+            meeting
+                .as_ref()
+                .is_none_or(|meeting| meeting.url.trim() != location.trim())
+        });
         let is_override = event.properties().contains_key(RECURRENCE_ID);
 
         // Google leaves `UNTIL` before `DTSTART` on old series, which no rule engine accepts and
@@ -89,6 +98,7 @@ pub fn expand(
                 uid: uid.to_string(),
                 summary: summary.clone(),
                 location: location.clone(),
+                meeting: meeting.clone(),
                 start,
                 end: start + length,
             });
@@ -187,6 +197,7 @@ mod tests {
 
         let occurrences = expand(
             &calendar,
+            &MeetingsConfig::default(),
             at("2026-03-02T00:00:00+01:00"),
             at("2026-03-03T00:00:00+01:00"),
         );
@@ -214,6 +225,7 @@ mod tests {
 
         let occurrences = expand(
             &calendar,
+            &MeetingsConfig::default(),
             at("2026-03-01T00:00:00+01:00"),
             at("2026-04-14T00:00:00+02:00"),
         );
@@ -234,6 +246,59 @@ mod tests {
     }
 
     #[test]
+    fn a_location_that_is_the_join_link_is_not_repeated() {
+        let calendar = parse(&wrap(
+            "BEGIN:VEVENT\r\n\
+             UID:one\r\n\
+             SUMMARY:Standup\r\n\
+             LOCATION:https://us02web.zoom.us/j/81891522989\r\n\
+             DTSTART;TZID=Europe/Amsterdam:20260302T090000\r\n\
+             DTEND;TZID=Europe/Amsterdam:20260302T091500\r\n\
+             END:VEVENT\r\n",
+        ));
+
+        let occurrences = expand(
+            &calendar,
+            &MeetingsConfig::default(),
+            at("2026-03-02T00:00:00+01:00"),
+            at("2026-03-03T00:00:00+01:00"),
+        );
+
+        assert_eq!(occurrences[0].location, None);
+        assert_eq!(
+            occurrences[0].meeting.as_ref().unwrap().provider.as_deref(),
+            Some("zoom")
+        );
+    }
+
+    #[test]
+    fn a_location_that_is_a_room_is_kept_beside_the_meeting() {
+        let calendar = parse(&wrap(
+            "BEGIN:VEVENT\r\n\
+             UID:one\r\n\
+             SUMMARY:Design review\r\n\
+             LOCATION:Room 4\r\n\
+             X-GOOGLE-CONFERENCE:https://meet.google.com/jwc-vnyk-izt\r\n\
+             DTSTART;TZID=Europe/Amsterdam:20260302T090000\r\n\
+             DTEND;TZID=Europe/Amsterdam:20260302T091500\r\n\
+             END:VEVENT\r\n",
+        ));
+
+        let occurrences = expand(
+            &calendar,
+            &MeetingsConfig::default(),
+            at("2026-03-02T00:00:00+01:00"),
+            at("2026-03-03T00:00:00+01:00"),
+        );
+
+        assert_eq!(occurrences[0].location.as_deref(), Some("Room 4"));
+        assert_eq!(
+            occurrences[0].meeting.as_ref().unwrap().provider.as_deref(),
+            Some("meet")
+        );
+    }
+
+    #[test]
     fn an_excluded_date_is_not_an_occurrence() {
         let calendar = parse(&wrap(
             "BEGIN:VEVENT\r\n\
@@ -248,6 +313,7 @@ mod tests {
 
         let occurrences = expand(
             &calendar,
+            &MeetingsConfig::default(),
             at("2026-03-01T00:00:00+01:00"),
             at("2026-03-06T00:00:00+01:00"),
         );
@@ -273,6 +339,7 @@ mod tests {
 
         let occurrences = expand(
             &calendar,
+            &MeetingsConfig::default(),
             at("2026-03-02T10:00:00+01:00"),
             at("2026-03-02T23:00:00+01:00"),
         );
@@ -301,6 +368,7 @@ mod tests {
 
         let occurrences = expand(
             &calendar,
+            &MeetingsConfig::default(),
             at("2026-08-28T00:00:00Z"),
             at("2026-08-29T00:00:00Z"),
         );
@@ -331,6 +399,7 @@ mod tests {
 
         let occurrences = expand(
             &calendar,
+            &MeetingsConfig::default(),
             at("2026-03-01T00:00:00+01:00"),
             at("2026-03-06T00:00:00+01:00"),
         );

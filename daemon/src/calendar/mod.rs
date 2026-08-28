@@ -1,6 +1,8 @@
 pub mod feed;
+pub mod meeting;
 pub mod occurrence;
 
+pub use meeting::Meeting;
 pub use occurrence::Occurrence;
 
 use std::{
@@ -15,7 +17,7 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::{
-    config::{Calendar, NotificationMode},
+    config::{Calendar, MeetingsConfig, NotificationMode},
     notifications::{Level, Notification},
     state::AppState,
 };
@@ -33,6 +35,7 @@ struct Parsed {
     calendar: IcalCalendar,
     fetched_at: Instant,
     stale: bool,
+    last_attempt_failed: bool,
 }
 
 pub async fn run(app_state: Arc<AppState>) {
@@ -47,12 +50,17 @@ pub async fn run(app_state: Arc<AppState>) {
             continue;
         }
 
-        reconcile(&app_state, &feeds, &config.calendars).await;
+        reconcile(&app_state, &feeds, &config.meetings, &config.calendars).await;
         tokio::time::sleep(config.poll.into()).await;
     }
 }
 
-async fn reconcile(app_state: &Arc<AppState>, feeds: &Feeds, calendars: &[Calendar]) {
+async fn reconcile(
+    app_state: &Arc<AppState>,
+    feeds: &Feeds,
+    meetings: &MeetingsConfig,
+    calendars: &[Calendar],
+) {
     let now = Local::now();
     let mut wanted = HashSet::new();
 
@@ -62,7 +70,7 @@ async fn reconcile(app_state: &Arc<AppState>, feeds: &Feeds, calendars: &[Calend
         };
 
         let until = now + chrono::Duration::from_std(calendar.window.into()).unwrap_or_default();
-        let occurrences = occurrence::expand(&reading.calendar, now, until);
+        let occurrences = occurrence::expand(&reading.calendar, meetings, now, until);
 
         for occurrence in &occurrences {
             wanted.insert(push_entry(app_state, calendar, occurrence, now).await);
@@ -93,9 +101,9 @@ struct Reading {
 async fn read(app_state: &Arc<AppState>, feeds: &Feeds, calendar: &Calendar) -> Option<Reading> {
     let mut parsed = feeds.parsed.lock().await;
 
-    let due = parsed
-        .get(&calendar.calendar_id)
-        .is_none_or(|held| held.fetched_at.elapsed() >= calendar.refresh.into());
+    let due = parsed.get(&calendar.calendar_id).is_none_or(|held| {
+        held.last_attempt_failed || held.fetched_at.elapsed() >= calendar.refresh.into()
+    });
 
     if due {
         match feed::load(calendar, &app_state.config.dirs.cache).await {
@@ -106,6 +114,7 @@ async fn read(app_state: &Arc<AppState>, feeds: &Feeds, calendar: &Calendar) -> 
                         calendar: fetched,
                         fetched_at: Instant::now(),
                         stale: false,
+                        last_attempt_failed: false,
                     },
                 );
             }
@@ -125,6 +134,7 @@ async fn read(app_state: &Arc<AppState>, feeds: &Feeds, calendar: &Calendar) -> 
                         calendar: fetched,
                         fetched_at: Instant::now(),
                         stale,
+                        last_attempt_failed: true,
                     },
                 );
             }
@@ -167,6 +177,7 @@ async fn push_entry(
                 starts_at: Some(occurrence.start),
                 ends_at: Some(occurrence.end),
                 location: occurrence.location.clone(),
+                meeting: occurrence.meeting.clone(),
                 tab_id: None,
                 stinger: None,
             },
@@ -215,6 +226,7 @@ async fn push_toast(
                 starts_at: Some(occurrence.start),
                 ends_at: Some(occurrence.end),
                 location: None,
+                meeting: occurrence.meeting.clone(),
                 tab_id: None,
                 stinger: None,
             },
@@ -246,6 +258,7 @@ async fn push_stale_warning(
                 starts_at: None,
                 ends_at: None,
                 location: None,
+                meeting: None,
                 tab_id: None,
                 stinger: None,
             },

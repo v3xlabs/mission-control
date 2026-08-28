@@ -21,3 +21,6 @@ url = "http://127.0.0.1:3177/api/media/lab.ics"
 # refresh = "15m"
 # window = "12h"
 # url = "https://calendar.example.com/private/basic.ics"
+
+[meetings.providers]
+jitsi = ["meet.jit.si", "*.jit.si", "eu.meet.example.com"]

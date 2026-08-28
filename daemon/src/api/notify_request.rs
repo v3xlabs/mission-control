@@ -51,6 +51,7 @@ impl NotifyRequest {
                 mode: self.mode.unwrap_or(defaults.mode),
                 expires_in_seconds: duration.seconds(),
                 starts_at: self.starts_at,
+                meeting: None,
                 ends_at: self.ends_at,
                 location: self.location,
                 tab_id: self.tab_id,

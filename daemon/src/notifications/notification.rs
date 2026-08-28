@@ -2,7 +2,7 @@ use chrono::{DateTime, Local};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
-use crate::config::NotificationMode;
+use crate::{calendar::Meeting, config::NotificationMode};
 
 use super::Level;
 
@@ -28,6 +28,8 @@ pub struct Notification {
     pub ends_at: Option<DateTime<Local>>,
     #[serde(default)]
     pub location: Option<String>,
+    #[serde(default)]
+    pub meeting: Option<Meeting>,
     /// A tab to put on screen instead of a message card, so an alert about a camera shows the
     /// stream rather than a sentence describing it.
     #[serde(default)]

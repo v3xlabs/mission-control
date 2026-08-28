@@ -104,6 +104,9 @@
         version = 1;
         calendars = dropNulls (namedList "calendar_id" cfg.settings.calendars);
       }
+      // lib.optionalAttrs (cfg.settings.meetings != {}) {
+        meetings = cfg.settings.meetings;
+      }
       // cfg.settings.calendarDefaults))} "$out/calendars.toml"
 
     # A stinger clip is a build input like anything else, so the media directory is assembled
@@ -278,6 +281,23 @@ in {
               A feed's address is the credential for it, so `url` takes the same reference an
               RTSP camera does: `url.file` for a path, `url.env` for an environment variable, or
               a plain string when the link is not a secret.
+            '';
+          };
+
+          meetings = lib.mkOption {
+            type = passthrough;
+            default = {};
+            example = lib.literalExpression ''
+              {
+                providers.jitsi = ["meet.jit.si" "*.jitsi.example.org"];
+              }
+            '';
+            description = ''
+              Host patterns keyed by meeting provider, used to put an icon beside a calendar
+              entry. `*.example.com` matches any subdomain and not `example.com` itself.
+
+              Merged over the built-in providers by name, so naming one does not mean restating
+              the rest. Zoom, Google Meet, Jitsi, Webex and Teams are recognised out of the box.
             '';
           };
 

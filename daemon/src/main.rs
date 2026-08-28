@@ -52,8 +52,6 @@ async fn main() -> Result<()> {
     }
 
     tokio::spawn(run_schedule(state.clone()));
-    tokio::spawn(notifications::surfaces::run(state.clone()));
-    tokio::spawn(calendar::run(state.clone()));
 
     if state.hass.is_enabled() {
         let hass = state.hass.clone();
@@ -70,6 +68,13 @@ async fn main() -> Result<()> {
             error!("http server stopped: {error}");
         }
     });
+
+    // Chromium never retries a navigation it could not connect for, so a surface opened before the
+    // port accepts stays on its error page until something closes and reopens the window.
+    await_http(&state).await;
+
+    tokio::spawn(notifications::surfaces::run(state.clone()));
+    tokio::spawn(calendar::run(state.clone()));
 
     tokio::select! {
         _ = http => {}
@@ -111,6 +116,32 @@ async fn shutdown_signal() -> &'static str {
             "SIGINT"
         }
     }
+}
+
+async fn await_http(state: &Arc<AppState>) {
+    const ATTEMPTS: usize = 100;
+    const POLL: Duration = Duration::from_millis(50);
+
+    let http = state.config.read().await.device.http;
+    let address = format!(
+        "{}:{}",
+        if http.host == "0.0.0.0" {
+            "127.0.0.1"
+        } else {
+            &http.host
+        },
+        http.port
+    );
+
+    for _ in 0..ATTEMPTS {
+        if tokio::net::TcpStream::connect(&address).await.is_ok() {
+            return;
+        }
+
+        tokio::time::sleep(POLL).await;
+    }
+
+    warn!("{address} is not accepting connections, starting the pages that read it anyway");
 }
 
 async fn run_schedule(state: Arc<AppState>) {

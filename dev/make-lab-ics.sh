@@ -18,7 +18,7 @@ PRODID:-//missiond//lab//EN
 BEGIN:VEVENT
 UID:lab-standup
 SUMMARY:Standup
-LOCATION:Room 2
+LOCATION:https://us02web.zoom.us/j/81891522989
 DTSTART:$(stamp "$offset")
 DTEND:$(stamp $((offset + 15)))
 END:VEVENT
@@ -26,16 +26,24 @@ BEGIN:VEVENT
 UID:lab-review
 SUMMARY:Design review
 LOCATION:Room 4
+X-GOOGLE-CONFERENCE:https://meet.google.com/jwc-vnyk-izt
 DTSTART:$(stamp $((offset + 40)))
 DTEND:$(stamp $((offset + 100)))
 END:VEVENT
 BEGIN:VEVENT
 UID:lab-weekly
 SUMMARY:Weekly sync
-LOCATION:Online
+LOCATION:https://eu.meet.example.com/WeeklySync
 DTSTART:$(stamp $((offset + 180)))
 DTEND:$(stamp $((offset + 210)))
 RRULE:FREQ=DAILY;COUNT=3
+END:VEVENT
+BEGIN:VEVENT
+UID:lab-offsite
+SUMMARY:Offsite planning
+LOCATION:Room 4
+DTSTART:$(stamp $((offset + 240)))
+DTEND:$(stamp $((offset + 300)))
 END:VEVENT
 END:VCALENDAR
 ICS

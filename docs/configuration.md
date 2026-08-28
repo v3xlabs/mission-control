@@ -559,6 +559,48 @@ with `MISSIOND_CALENDAR_<ID>` rather than printing it.
 "in 3 minutes" is wrong a minute later, and asking a calendar server that often to learn something
 it has not changed would be rude and slower than reading what is already in memory.
 
+### Meeting links
+
+An entry that names a video call carries its provider, and the rail draws that provider's icon
+beside the title.
+
+The link is looked for in three places, in this order, because they are not equally trustworthy. A
+dedicated conference property, `X-GOOGLE-CONFERENCE` or the `CONFERENCE` of RFC 7986, holds a link
+and nothing else. `LOCATION` holds one often enough to be worth reading, but a real feed also puts
+prose there, and "Find the Zoom link on Discord" is a location rather than a url. `DESCRIPTION` is
+mostly prose that happens to contain links, and the first one is as likely to be an issue tracker
+as a meeting, so a link found there counts only when a provider claims it.
+
+A provider is a name and a list of host patterns:
+
+```toml
+[meetings.providers]
+jitsi = ["meet.jit.si", "*.jitsi.example.org"]
+```
+
+`*.example.com` matches any subdomain and not `example.com` itself, which is why a provider that
+answers on both lists both. The wildcard is anchored to a label boundary, so `*.zoom.us` does not
+claim `evilzoom.us`.
+
+These are recognised without any configuration:
+
+| Provider | Hosts |
+| --- | --- |
+| `zoom` | `zoom.us`, `*.zoom.us` |
+| `meet` | `meet.google.com` |
+| `jitsi` | `meet.jit.si`, `*.jit.si` |
+| `webex` | `webex.com`, `*.webex.com` |
+| `teams` | `teams.microsoft.com`, `teams.live.com` |
+
+`providers` is merged over that table by name, so naming one does not mean restating the rest.
+That is what makes a custom domain a single line: a self-hosted Jitsi, or a Zoom vanity domain
+that is not a `zoom.us` subdomain, replaces only its own entry. Setting a name to `[]` turns that
+provider off.
+
+A name missiond has no icon for still reaches the page and renders with a generic camera, so a
+provider can be added here alone. A link no pattern claims keeps its url and gets no icon: the
+entry is still a meeting, missiond just cannot say whose.
+
 ### What reaches the screen
 
 An entry is on the rail from the moment it falls inside `window` until it ends, which makes this an
