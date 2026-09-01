@@ -607,6 +607,14 @@ An entry is on the rail from the moment it falls inside `window` until it ends, 
 agenda rather than a stack of reminders. Each entry drops itself the minute its meeting finishes,
 whether or not a poll runs first.
 
+One meeting that two feeds both carry is one entry. Two people sharing a display are invited to the
+same thing often, and the copies do not agree on a `UID` once a calendar has exported them, so what
+a viewer can see decides it: the title, the start, the end, the location and the join link. The feed
+listed first in `calendars.toml` keeps the entry, and the copy is dropped along with its toasts.
+
+Meetings that start at the same time share one time on the rail and are drawn under it, so a clash
+reads as a clash rather than as two rows that happen to be next to each other.
+
 A toast goes up at each of `leads`. With the default `["5m", "0s"]` that is one five minutes out and
 one as the meeting begins. The window a toast is up for is absolute, `start - lead` to
 `toast_duration` later, rather than a crossing the daemon has to remember, so a restart at four

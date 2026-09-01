@@ -13,37 +13,8 @@ const edge = {
 
 const clock = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
 
-export const AlertCard: FC<{ alert: Alert; isLarge: boolean; isWide?: boolean; }> = ({
-  alert,
-  isLarge,
-  isWide = false,
-}) => {
+export const AlertCard: FC<{ alert: Alert; isLarge: boolean; }> = ({ alert, isLarge }) => {
   const relative = useCountdown(alert.starts_at);
-
-  if (isWide) {
-    return (
-      <article className="flex w-full items-center bg-gray-900">
-        <div className={classNames("w-2 self-stretch shrink-0", edge[alert.level])} />
-        <div className="w-64 shrink-0 p-6">
-          {alert.starts_at && (
-            <>
-              <p className="text-4xl font-medium text-gray-200">
-                {clock.format(new Date(alert.starts_at))}
-              </p>
-              {relative && <p className="mt-1 text-xl text-gray-500">{relative}</p>}
-            </>
-          )}
-        </div>
-        <div className="min-w-0 py-6 pr-6">
-          <div className="flex items-center gap-4">
-            {alert.meeting && <MeetingIcon meeting={alert.meeting} className="size-8 shrink-0" />}
-            <h1 className="truncate text-4xl font-semibold text-gray-100">{alert.title}</h1>
-          </div>
-          {alert.location && <p className="mt-2 text-2xl text-gray-500">{alert.location}</p>}
-        </div>
-      </article>
-    );
-  }
 
   return (
     <article className={classNames("flex w-full bg-gray-900", isLarge && "max-w-5xl")}>

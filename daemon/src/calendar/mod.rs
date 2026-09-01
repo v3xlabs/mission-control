@@ -63,6 +63,7 @@ async fn reconcile(
 ) {
     let now = Local::now();
     let mut wanted = HashSet::new();
+    let mut scheduled = Vec::new();
 
     for calendar in calendars {
         let Some(reading) = read(app_state, feeds, calendar).await else {
@@ -70,20 +71,34 @@ async fn reconcile(
         };
 
         let until = now + chrono::Duration::from_std(calendar.window.into()).unwrap_or_default();
-        let occurrences = occurrence::expand(&reading.calendar, meetings, now, until);
 
-        for occurrence in &occurrences {
-            wanted.insert(push_entry(app_state, calendar, occurrence, now).await);
-
-            for lead in &calendar.leads {
-                if let Some(key) = push_toast(app_state, calendar, occurrence, *lead, now).await {
-                    wanted.insert(key);
-                }
-            }
+        for occurrence in occurrence::expand(&reading.calendar, meetings, now, until) {
+            scheduled.push((calendar, occurrence));
         }
 
         if reading.stale {
             wanted.insert(push_stale_warning(app_state, calendar, now).await);
+        }
+    }
+
+    // The sort is stable, so of two feeds carrying one meeting the earlier one in the
+    // configuration keeps it, and the entry keeps its key from poll to poll.
+    scheduled.sort_by_key(|(_, occurrence)| occurrence.start);
+
+    let mut seen = HashSet::new();
+
+    for (calendar, occurrence) in &scheduled {
+        // A meeting two people on this display are both invited to is one meeting.
+        if !seen.insert(occurrence.fingerprint()) {
+            continue;
+        }
+
+        wanted.insert(push_entry(app_state, calendar, occurrence, now).await);
+
+        for lead in &calendar.leads {
+            if let Some(key) = push_toast(app_state, calendar, occurrence, *lead, now).await {
+                wanted.insert(key);
+            }
         }
     }
 

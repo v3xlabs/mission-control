@@ -28,7 +28,28 @@ impl Occurrence {
             self.start.to_rfc3339()
         )
     }
+
+    /// Two feeds that both carry one meeting hold it under two calendar ids, and an invitation
+    /// exported twice does not keep its `UID` either, so what a viewer can see is what decides
+    /// that two entries are one meeting.
+    pub fn fingerprint(&self) -> Fingerprint<'_> {
+        (
+            self.summary.as_str(),
+            self.start,
+            self.end,
+            self.location.as_deref(),
+            self.meeting.as_ref().map(|meeting| meeting.url.as_str()),
+        )
+    }
 }
+
+type Fingerprint<'a> = (
+    &'a str,
+    DateTime<Local>,
+    DateTime<Local>,
+    Option<&'a str>,
+    Option<&'a str>,
+);
 
 /// A rule with no `UNTIL` and no `COUNT` is infinite, so the expansion needs a bound of its own.
 const LIMIT: u16 = 512;
@@ -405,5 +426,58 @@ mod tests {
         );
 
         assert_ne!(occurrences[0].key("work"), occurrences[1].key("work"));
+    }
+
+    #[test]
+    fn one_meeting_read_from_two_feeds_has_one_fingerprint() {
+        let event = |uid: &str| {
+            format!(
+                "BEGIN:VEVENT\r\n\
+                 UID:{uid}\r\n\
+                 SUMMARY:Design review\r\n\
+                 LOCATION:Room 4\r\n\
+                 DTSTART;TZID=Europe/Amsterdam:20260302T140000\r\n\
+                 DTEND;TZID=Europe/Amsterdam:20260302T150000\r\n\
+                 END:VEVENT\r\n"
+            )
+        };
+
+        let read = |uid: &str| {
+            expand(
+                &parse(&wrap(&event(uid))),
+                &MeetingsConfig::default(),
+                at("2026-03-02T00:00:00+01:00"),
+                at("2026-03-03T00:00:00+01:00"),
+            )
+        };
+
+        assert_eq!(read("work")[0].fingerprint(), read("personal")[0].fingerprint());
+    }
+
+    #[test]
+    fn two_meetings_at_one_time_have_two_fingerprints() {
+        let calendar = parse(&wrap(
+            "BEGIN:VEVENT\r\n\
+             UID:one\r\n\
+             SUMMARY:Design review\r\n\
+             DTSTART;TZID=Europe/Amsterdam:20260302T140000\r\n\
+             DTEND;TZID=Europe/Amsterdam:20260302T150000\r\n\
+             END:VEVENT\r\n\
+             BEGIN:VEVENT\r\n\
+             UID:two\r\n\
+             SUMMARY:Standup\r\n\
+             DTSTART;TZID=Europe/Amsterdam:20260302T140000\r\n\
+             DTEND;TZID=Europe/Amsterdam:20260302T150000\r\n\
+             END:VEVENT\r\n",
+        ));
+
+        let occurrences = expand(
+            &calendar,
+            &MeetingsConfig::default(),
+            at("2026-03-02T00:00:00+01:00"),
+            at("2026-03-03T00:00:00+01:00"),
+        );
+
+        assert_ne!(occurrences[0].fingerprint(), occurrences[1].fingerprint());
     }
 }
