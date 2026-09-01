@@ -451,7 +451,10 @@ mod tests {
             )
         };
 
-        assert_eq!(read("work")[0].fingerprint(), read("personal")[0].fingerprint());
+        assert_eq!(
+            read("work")[0].fingerprint(),
+            read("personal")[0].fingerprint()
+        );
     }
 
     #[test]

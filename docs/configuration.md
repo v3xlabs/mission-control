@@ -143,8 +143,23 @@ substituted. The defaults are the niri commands above.
 | `screenshot` | array | Writes the output's current contents to stdout. The default uses `grim`, which speaks wlr-screencopy. |
 | `schedule` | array of tables | Weekly windows during which the screen is on. |
 
-A window whose `to` is earlier than its `from` runs past midnight. A day with no window is off.
-With no windows at all the schedule has no opinion and never touches the screen.
+`days` names the days a window *starts* on. A window whose `to` is earlier than its `from` runs past
+midnight and ends on the next morning, which belongs to the evening that opened it:
+
+```toml
+[[schedule]]
+days = ["mon", "tue", "wed", "thu", "fri"]
+from = "09:00"
+to   = "04:00"
+```
+
+is on from nine each weekday morning until four the next morning, Saturday morning included, and
+does not come on at midnight on Sunday because Sunday is not a day it starts on.
+
+A window whose `from` and `to` are equal is the whole day, which `HH:MM` cannot otherwise say. A day
+with no window is off. With no windows at all the schedule has no opinion and never touches the
+screen. A time that is not `HH:MM` stops the daemon at load rather than leaving the screen dark all
+day for a reason nothing reports.
 
 The schedule sets the baseline. A command from the API or from MQTT overrides it, and the override
 holds until the next schedule boundary rather than forever, so turning the screen on at midnight

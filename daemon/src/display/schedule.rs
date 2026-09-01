@@ -1,4 +1,6 @@
-use chrono::{Datelike, Local, NaiveTime, Timelike};
+use std::cmp::Ordering;
+
+use chrono::{Datelike, Local};
 
 use crate::config::{ScheduleWindow, Weekday};
 
@@ -15,22 +17,22 @@ pub fn baseline_at(windows: &[ScheduleWindow], at: chrono::DateTime<Local>) -> B
     }
 
     let today = Weekday::from_chrono(at.weekday());
+    let yesterday = Weekday::from_chrono(at.weekday().pred());
     let now = at.time();
 
     for window in windows {
-        if !window.days.contains(&today) {
-            continue;
-        }
-
-        let (Some(from), Some(to)) = (parse_time(&window.from), parse_time(&window.to)) else {
-            continue;
-        };
-
-        // A window that ends before it starts runs past midnight.
-        let inside = if from <= to {
-            now >= from && now < to
-        } else {
-            now >= from || now < to
+        let inside = match window.from.cmp(&window.to) {
+            Ordering::Less => window.days.contains(&today) && now >= window.from && now < window.to,
+            // A window that ends before it starts runs past midnight, and the hours after midnight
+            // belong to the evening that opened them rather than to the day the clock now names.
+            // Weekdays 09:00 to 04:00 has to end on Saturday morning, not stop at Friday midnight.
+            Ordering::Greater => {
+                (window.days.contains(&today) && now >= window.from)
+                    || (window.days.contains(&yesterday) && now < window.to)
+            }
+            // A window that ends where it starts is the whole day, which is otherwise something
+            // `HH:MM` cannot say.
+            Ordering::Equal => window.days.contains(&today),
         };
 
         if inside {
@@ -41,46 +43,37 @@ pub fn baseline_at(windows: &[ScheduleWindow], at: chrono::DateTime<Local>) -> B
     Baseline::Off
 }
 
-pub fn seconds_until_next_boundary(windows: &[ScheduleWindow], at: chrono::DateTime<Local>) -> u64 {
-    let now = at.time().num_seconds_from_midnight() as i64;
-
-    let next = windows
-        .iter()
-        .flat_map(|window| [parse_time(&window.from), parse_time(&window.to)])
-        .flatten()
-        .map(|time| time.num_seconds_from_midnight() as i64)
-        .filter(|seconds| *seconds > now)
-        .min();
-
-    match next {
-        Some(seconds) => (seconds - now) as u64,
-        None => (86_400 - now) as u64,
-    }
-}
-
-fn parse_time(text: &str) -> Option<NaiveTime> {
-    NaiveTime::parse_from_str(text, "%H:%M").ok()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use chrono::{NaiveTime, TimeZone};
+
+    fn at_time(text: &str) -> NaiveTime {
+        NaiveTime::parse_from_str(text, "%H:%M").expect("a time of day")
+    }
 
     fn window(days: &[Weekday], from: &str, to: &str) -> ScheduleWindow {
         ScheduleWindow {
             days: days.to_vec(),
-            from: from.to_string(),
-            to: to.to_string(),
+            from: at_time(from),
+            to: at_time(to),
         }
     }
 
-    /// 2026-08-24 is a Monday.
-    fn monday_at(hour: u32, minute: u32) -> chrono::DateTime<Local> {
+    /// 2026-08-24 is a Monday, so the week runs from day 24 to day 30.
+    fn day_at(day: u32, hour: u32, minute: u32) -> chrono::DateTime<Local> {
         Local
-            .with_ymd_and_hms(2026, 8, 24, hour, minute, 0)
+            .with_ymd_and_hms(2026, 8, day, hour, minute, 0)
             .single()
             .expect("valid local time")
+    }
+
+    fn monday_at(hour: u32, minute: u32) -> chrono::DateTime<Local> {
+        day_at(24, hour, minute)
+    }
+
+    fn saturday_at(hour: u32, minute: u32) -> chrono::DateTime<Local> {
+        day_at(29, hour, minute)
     }
 
     #[test]
@@ -115,32 +108,39 @@ mod tests {
         let windows = [window(&[Weekday::Mon], "22:00", "02:00")];
 
         assert_eq!(baseline_at(&windows, monday_at(23, 0)), Baseline::On);
-        assert_eq!(baseline_at(&windows, monday_at(1, 0)), Baseline::On);
+        assert_eq!(baseline_at(&windows, day_at(25, 1, 0)), Baseline::On);
         assert_eq!(baseline_at(&windows, monday_at(12, 0)), Baseline::Off);
     }
 
+    /// The reason the day set names the day a window starts on: a Monday morning is not on unless
+    /// Sunday evening was.
     #[test]
-    fn a_malformed_time_does_not_turn_the_screen_on() {
-        let windows = [window(&[Weekday::Mon], "half past seven", "23:00")];
+    fn the_hours_after_midnight_belong_to_the_evening_that_opened_them() {
+        let weekdays = [window(
+            &[
+                Weekday::Mon,
+                Weekday::Tue,
+                Weekday::Wed,
+                Weekday::Thu,
+                Weekday::Fri,
+            ],
+            "09:00",
+            "04:00",
+        )];
 
-        assert_eq!(baseline_at(&windows, monday_at(9, 0)), Baseline::Off);
+        assert_eq!(baseline_at(&weekdays, saturday_at(2, 0)), Baseline::On);
+        assert_eq!(baseline_at(&weekdays, saturday_at(4, 0)), Baseline::Off);
+        assert_eq!(baseline_at(&weekdays, saturday_at(10, 0)), Baseline::Off);
+        assert_eq!(baseline_at(&weekdays, monday_at(2, 0)), Baseline::Off);
+        assert_eq!(baseline_at(&weekdays, monday_at(9, 0)), Baseline::On);
     }
 
     #[test]
-    fn the_next_boundary_is_the_next_edge_today() {
-        let windows = [window(&[Weekday::Mon], "07:30", "23:00")];
+    fn a_window_that_ends_where_it_starts_is_the_whole_day() {
+        let windows = [window(&[Weekday::Sat], "00:00", "00:00")];
 
-        assert_eq!(
-            seconds_until_next_boundary(&windows, monday_at(7, 0)),
-            30 * 60
-        );
-    }
-
-    #[test]
-    fn past_the_last_edge_the_boundary_is_tomorrow() {
-        let windows = [window(&[Weekday::Mon], "07:30", "23:00")];
-        let seconds = seconds_until_next_boundary(&windows, monday_at(23, 30));
-
-        assert_eq!(seconds, 30 * 60);
+        assert_eq!(baseline_at(&windows, saturday_at(0, 0)), Baseline::On);
+        assert_eq!(baseline_at(&windows, saturday_at(23, 59)), Baseline::On);
+        assert_eq!(baseline_at(&windows, monday_at(12, 0)), Baseline::Off);
     }
 }
