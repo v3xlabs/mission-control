@@ -13,3 +13,20 @@ label:has(input:not(:disabled)),
 button:disabled {
   cursor: not-allowed;
 }
+
+/* An entry on the rail's axis is as tall as its meeting is long, and a fifteen minute meeting has
+   room for a title and nothing else. What does not fit is dropped rather than sliced through the
+   middle of a line. */
+.rail-entry {
+  container-type: size;
+}
+
+.rail-entry-detail {
+  display: none;
+}
+
+@container (min-height: 3.2em) {
+  .rail-entry-detail {
+    display: flex;
+  }
+}

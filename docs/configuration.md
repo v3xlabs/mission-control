@@ -627,8 +627,18 @@ same thing often, and the copies do not agree on a `UID` once a calendar has exp
 a viewer can see decides it: the title, the start, the end, the location and the join link. The feed
 listed first in `calendars.toml` keeps the entry, and the copy is dropped along with its toasts.
 
-Meetings that start at the same time share one time on the rail and are drawn under it, so a clash
-reads as a clash rather than as two rows that happen to be next to each other.
+The rail draws the day on a time axis rather than as a list. Vertical position is the clock and
+height is the length of the meeting, at one scale from the top of the rail to the bottom, so an hour
+of waiting takes an hour of room and the gap before the afternoon is drawn rather than described.
+The axis starts at the current time and reaches the end of the last entry, and never covers less
+than two hours, so one short meeting does not fill the panel on its own.
+
+Meetings that overlap share the width, one lane each, which is what makes a clash read as a clash. A
+meeting too short to hold a line of text is given one anyway, so a ten minute slot keeps its title
+and loses its second line.
+
+A meeting that has started is lifted off the axis to the top of the rail, with a bar for how much of
+it is left. Its start is behind us, so how far away it is has stopped being the question.
 
 A toast goes up at each of `leads`. With the default `["5m", "0s"]` that is one five minutes out and
 one as the meeting begins. The window a toast is up for is absolute, `start - lead` to

@@ -1,73 +1,148 @@
 import type { Alert } from "./useAlerts";
 
-/** Two meetings that start together are one entry on the rail, under one time. */
-export type Slot = {
+/** An alert that names a time, which is what the axis can place. */
+export type Timed = {
+  alert: Alert;
   startsAt: number;
-  alerts: Alert[];
+  endsAt: number;
 };
 
-/** How near a meeting is, which is what the rail says with size, weight and contrast. */
-export type Nearness = "live" | "starting" | "soon" | "later";
+/** A place on the axis. Meetings that overlap share the width, one lane each. */
+export type Placed = Timed & {
+  lane: number;
+  lanes: number;
+};
 
-const STARTING_MS = 5 * 60_000;
-const SOON_MS = 60 * 60_000;
+export type Nearness = "starting" | "soon" | "later";
 
-export const scheduleOf = (alerts: Alert[]): Slot[] => {
-  const slots = new Map<number, Alert[]>();
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const STARTING_MS = 5 * MINUTE_MS;
+const SOON_MS = HOUR_MS;
 
-  for (const alert of alerts) {
-    if (!alert.starts_at) {
-      continue;
+/** Short enough to read, long enough that one short meeting does not fill the rail on its own. */
+const SHORTEST_SPAN_MS = 2 * HOUR_MS;
+
+export const timedOf = (alerts: Alert[]): Timed[] =>
+  alerts
+    .flatMap((alert) => {
+      if (!alert.starts_at) {
+        return [];
+      }
+
+      const startsAt = new Date(alert.starts_at).getTime();
+
+      // An alert with no end is a moment rather than a span, and takes the height of one line.
+      return [{
+        alert,
+        startsAt,
+        endsAt: alert.ends_at ? new Date(alert.ends_at).getTime() : startsAt,
+      }];
+    })
+    .toSorted((one, other) => one.startsAt - other.startsAt);
+
+/**
+ * Lanes are counted per run of meetings that overlap, so two at one time each take half the width
+ * and a meeting standing on its own keeps all of it.
+ */
+export const placed = (entries: Timed[]): Placed[] => {
+  const out: Placed[] = [];
+  let run: Timed[] = [];
+  let runEnds = 0;
+
+  const flush = () => {
+    if (run.length === 0) {
+      return;
     }
 
-    const startsAt = new Date(alert.starts_at).getTime();
-    const together = slots.get(startsAt);
+    const laneEnds: number[] = [];
+    const assigned = run.map((entry) => {
+      const free = laneEnds.findIndex(end => end <= entry.startsAt);
+      const lane = free === -1 ? laneEnds.length : free;
 
-    if (together) {
-      together.push(alert);
+      laneEnds[lane] = entry.endsAt;
+
+      return { entry, lane };
+    });
+
+    for (const { entry, lane } of assigned) {
+      out.push({ ...entry, lane, lanes: laneEnds.length });
     }
-    else {
-      slots.set(startsAt, [alert]);
+
+    run = [];
+    runEnds = 0;
+  };
+
+  for (const entry of entries) {
+    if (entry.startsAt >= runEnds) {
+      flush();
+    }
+
+    run.push(entry);
+    runEnds = Math.max(runEnds, entry.endsAt);
+  }
+
+  flush();
+
+  return out;
+};
+
+export const spanOf = (entries: Timed[], now: number) =>
+  Math.max(SHORTEST_SPAN_MS, ...entries.map(entry => entry.endsAt - now));
+
+export const percentOf = (at: number, from: number, spanMs: number) =>
+  ((at - from) / spanMs) * 100;
+
+/**
+ * Hour marks, thinned as the axis covers more of the day, so two labels never sit on each other.
+ * The first mark of the day is dropped when it lands under the current time, which is written at
+ * the top of the same gutter.
+ */
+export const ticksOf = (from: number, spanMs: number): number[] => {
+  const step = stepHoursOf(spanMs);
+  const clear = from + spanMs * 0.04;
+  const ticks: number[] = [];
+  const hour = new Date(from);
+
+  hour.setMinutes(0, 0, 0);
+
+  for (let at = hour.getTime(); at < from + spanMs; at += HOUR_MS) {
+    if (at >= clear && new Date(at).getHours() % step === 0) {
+      ticks.push(at);
     }
   }
 
-  return [...slots]
-    .map(([startsAt, together]) => ({ startsAt, alerts: together }))
-    .toSorted((one, other) => one.startsAt - other.startsAt);
+  return ticks;
+};
+
+const stepHoursOf = (spanMs: number) => {
+  if (spanMs <= 8 * HOUR_MS) {
+    return 1;
+  }
+
+  return spanMs <= 16 * HOUR_MS ? 2 : 3;
 };
 
 export const nearnessOf = (startsAt: number, now: number): Nearness => {
   const untilMs = startsAt - now;
 
-  if (untilMs <= 0) {
-    return "live";
-  }
-
   if (untilMs <= STARTING_MS) {
     return "starting";
   }
 
-  if (untilMs <= SOON_MS) {
-    return "soon";
-  }
-
-  return "later";
+  return untilMs <= SOON_MS ? "soon" : "later";
 };
 
-/**
- * A phrase is what a countdown is for, so it stops where a countdown stops being one. Beyond the
- * hour the clock time is the answer, and the rail says how far away it is by how quiet it draws it.
- */
-export const phraseOf = (startsAt: number, now: number): string | undefined => {
-  const nearness = nearnessOf(startsAt, now);
+/** What is left of a meeting that is already running, which is the one number the bar cannot give. */
+export const leftPhrase = (endsAt: number, now: number) => {
+  const minutes = Math.max(0, Math.round((endsAt - now) / MINUTE_MS));
 
-  if (nearness === "live") {
-    return "now";
+  if (minutes < 60) {
+    return `${minutes} min left`;
   }
 
-  if (nearness === "later") {
-    return undefined;
-  }
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
 
-  return `in ${Math.max(1, Math.round((startsAt - now) / 60_000))} min`;
+  return rest === 0 ? `${hours} h left` : `${hours} h ${rest} min left`;
 };
